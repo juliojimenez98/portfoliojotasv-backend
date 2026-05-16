@@ -1,0 +1,151 @@
+import { Request, Response } from 'express';
+import Account from '../models/Account';
+import Transaction from '../models/Transaction';
+
+// @route   GET /api/accounts
+// @desc    Get all accounts for the current user
+// @access  Private (gastos app)
+export const getAccounts = async (req: Request, res: Response) => {
+  const accounts = await Account.find({ userId: req.user?.id }).sort({ name: 1 });
+  res.status(200).json({ success: true, count: accounts.length, data: accounts });
+};
+
+// @route   GET /api/accounts/:id
+// @desc    Get single account
+// @access  Private (gastos app)
+export const getAccount = async (req: Request, res: Response) => {
+  const account = await Account.findOne({ _id: req.params.id, userId: req.user?.id });
+  if (!account) return res.status(404).json({ success: false, error: 'Account not found' });
+  res.status(200).json({ success: true, data: account });
+};
+
+// @route   POST /api/accounts
+// @desc    Create new account
+// @access  Private (gastos app)
+export const createAccount = async (req: Request, res: Response) => {
+  req.body.userId = req.user?.id;
+  const account = await Account.create(req.body);
+  res.status(201).json({ success: true, data: account });
+};
+
+// @route   PUT /api/accounts/:id
+// @desc    Update account
+// @access  Private (gastos app)
+export const updateAccount = async (req: Request, res: Response) => {
+  const account = await Account.findOneAndUpdate(
+    { _id: req.params.id, userId: req.user?.id },
+    req.body,
+    { new: true, runValidators: true }
+  );
+  if (!account) return res.status(404).json({ success: false, error: 'Account not found' });
+  res.status(200).json({ success: true, data: account });
+};
+
+// @route   DELETE /api/accounts/:id
+// @desc    Delete account
+// @access  Private (gastos app)
+export const deleteAccount = async (req: Request, res: Response) => {
+  const account = await Account.findOneAndDelete({ _id: req.params.id, userId: req.user?.id });
+  if (!account) return res.status(404).json({ success: false, error: 'Account not found' });
+  res.status(200).json({ success: true, data: {} });
+};
+
+// @route   POST /api/accounts/:id/deposit
+// @desc    Deposit money into an account
+// @access  Private (gastos app)
+export const depositToAccount = async (req: Request, res: Response) => {
+  const { amount, description } = req.body;
+
+  if (!amount || amount <= 0) {
+    return res.status(400).json({ success: false, error: 'Amount must be greater than 0' });
+  }
+
+  const account = await Account.findOne({ _id: req.params.id, userId: req.user?.id });
+  if (!account) return res.status(404).json({ success: false, error: 'Account not found' });
+
+  // Update balance
+  account.balance += amount;
+  await account.save();
+
+  // Create a transaction record for the deposit
+  await Transaction.create({
+    accountId: account._id,
+    userId: req.user?.id,
+    description: description || 'Depósito',
+    amount,
+    type: 'income',
+    category: 'other',
+    date: new Date(),
+    notes: `Abono a cuenta "${account.name}"`,
+  });
+
+  res.status(200).json({ success: true, data: account });
+};
+
+// @route   POST /api/accounts/transfer
+// @desc    Transfer money between accounts
+// @access  Private (gastos app)
+export const transferBetweenAccounts = async (req: Request, res: Response) => {
+  const { fromAccountId, toAccountId, amount, description } = req.body;
+
+  if (!fromAccountId || !toAccountId) {
+    return res.status(400).json({ success: false, error: 'Both source and destination accounts are required' });
+  }
+  if (fromAccountId === toAccountId) {
+    return res.status(400).json({ success: false, error: 'Cannot transfer to the same account' });
+  }
+  if (!amount || amount <= 0) {
+    return res.status(400).json({ success: false, error: 'Amount must be greater than 0' });
+  }
+
+  const fromAccount = await Account.findOne({ _id: fromAccountId, userId: req.user?.id });
+  const toAccount = await Account.findOne({ _id: toAccountId, userId: req.user?.id });
+
+  if (!fromAccount) return res.status(404).json({ success: false, error: 'Source account not found' });
+  if (!toAccount) return res.status(404).json({ success: false, error: 'Destination account not found' });
+
+  if (fromAccount.balance < amount) {
+    return res.status(400).json({ success: false, error: 'Insufficient funds in source account' });
+  }
+
+  // Execute transfer
+  fromAccount.balance -= amount;
+  toAccount.balance += amount;
+
+  await fromAccount.save();
+  await toAccount.save();
+
+  const transferDesc = description || `Transferencia de "${fromAccount.name}" a "${toAccount.name}"`;
+
+  // Record outgoing transaction
+  await Transaction.create({
+    accountId: fromAccount._id,
+    userId: req.user?.id,
+    description: transferDesc,
+    amount,
+    type: 'expense',
+    category: 'other',
+    date: new Date(),
+    notes: `Transferencia a "${toAccount.name}"`,
+  });
+
+  // Record incoming transaction
+  await Transaction.create({
+    accountId: toAccount._id,
+    userId: req.user?.id,
+    description: transferDesc,
+    amount,
+    type: 'income',
+    category: 'other',
+    date: new Date(),
+    notes: `Transferencia desde "${fromAccount.name}"`,
+  });
+
+  res.status(200).json({
+    success: true,
+    data: {
+      from: fromAccount,
+      to: toAccount,
+    },
+  });
+};
