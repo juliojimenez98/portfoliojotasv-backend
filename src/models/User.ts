@@ -1,16 +1,68 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+/**
+ * Payday configuration types:
+ *  - fixed_day          → a fixed day of the month (e.g. 5, 10, 15, 28)
+ *  - last_day           → last calendar day of the month
+ *  - last_business_day  → last business day (Mon–Fri) of the month
+ *  - business_days_before_end → N business days before end of month (e.g. 3)
+ *  - first_day          → 1st of the month
+ *  - first_business_day → first business day of the month
+ *  - custom_text        → free text description (e.g. "Quincena 15 y 30")
+ */
+export type PaydayType =
+  | 'fixed_day'
+  | 'last_day'
+  | 'last_business_day'
+  | 'business_days_before_end'
+  | 'first_day'
+  | 'first_business_day'
+  | 'custom_text';
+
+export interface PaydayConfig {
+  type: PaydayType;
+  fixedDay?: number;          // used when type === 'fixed_day'
+  businessDaysBefore?: number; // used when type === 'business_days_before_end'
+  customText?: string;         // used when type === 'custom_text'
+  accountId?: string;          // account where salary is received
+  amount?: number;             // expected salary amount (optional)
+  currency?: string;           // currency of the salary
+  label?: string;              // user-friendly label (e.g. "Salario principal")
+}
+
 export interface UserDocument extends Document {
   email: string;
   username: string;
   password: string;
   allowedApps: string[];
   isAdmin: boolean;
+  paydayConfig?: PaydayConfig;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
+
+const PaydayConfigSchema = new Schema<PaydayConfig>(
+  {
+    type: {
+      type: String,
+      enum: [
+        'fixed_day', 'last_day', 'last_business_day',
+        'business_days_before_end', 'first_day', 'first_business_day', 'custom_text',
+      ],
+      required: true,
+    },
+    fixedDay: { type: Number, min: 1, max: 31 },
+    businessDaysBefore: { type: Number, min: 1, max: 15 },
+    customText: { type: String, trim: true, maxlength: 100 },
+    accountId: { type: String },
+    amount: { type: Number, min: 0 },
+    currency: { type: String, default: 'CLP' },
+    label: { type: String, trim: true, maxlength: 80 },
+  },
+  { _id: false }
+);
 
 const UserSchema = new Schema<UserDocument>(
   {
@@ -43,6 +95,10 @@ const UserSchema = new Schema<UserDocument>(
     isAdmin: {
       type: Boolean,
       default: false,
+    },
+    paydayConfig: {
+      type: PaydayConfigSchema,
+      default: undefined,
     },
   },
   {
