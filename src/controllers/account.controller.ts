@@ -104,11 +104,7 @@ export const transferBetweenAccounts = async (req: Request, res: Response) => {
   if (!fromAccount) return res.status(404).json({ success: false, error: 'Source account not found' });
   if (!toAccount) return res.status(404).json({ success: false, error: 'Destination account not found' });
 
-  if (fromAccount.balance < amount) {
-    return res.status(400).json({ success: false, error: 'Insufficient funds in source account' });
-  }
-
-  // Execute transfer
+  // Execute transfer (no balance check — credit cards can be negative)
   fromAccount.balance -= amount;
   toAccount.balance += amount;
 
@@ -118,28 +114,40 @@ export const transferBetweenAccounts = async (req: Request, res: Response) => {
   const transferDesc = description || `Transferencia de "${fromAccount.name}" a "${toAccount.name}"`;
 
   // Record outgoing transaction
-  await Transaction.create({
+  const outgoing = await Transaction.create({
     accountId: fromAccount._id,
     userId: req.user?.id,
     description: transferDesc,
     amount,
-    type: 'expense',
-    category: 'other',
+    originalAmount: amount,
+    originalCurrency: 'CLP',
+    exchangeRate: 1,
+    type: 'transfer',
+    category: 'transfer',
     date: new Date(),
     notes: `Transferencia a "${toAccount.name}"`,
   });
 
   // Record incoming transaction
-  await Transaction.create({
+  const incoming = await Transaction.create({
     accountId: toAccount._id,
     userId: req.user?.id,
     description: transferDesc,
     amount,
-    type: 'income',
-    category: 'other',
+    originalAmount: amount,
+    originalCurrency: 'CLP',
+    exchangeRate: 1,
+    type: 'transfer',
+    category: 'transfer',
     date: new Date(),
     notes: `Transferencia desde "${fromAccount.name}"`,
   });
+
+  // Link both transactions to each other
+  outgoing.linkedTransactionId = incoming._id;
+  incoming.linkedTransactionId = outgoing._id;
+  await outgoing.save();
+  await incoming.save();
 
   res.status(200).json({
     success: true,

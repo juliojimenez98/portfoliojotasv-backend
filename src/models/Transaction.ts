@@ -13,6 +13,8 @@ export interface TransactionDocument extends Document {
   category: string;
   date: Date;
   notes?: string;
+  subscriptionId?: Types.ObjectId;
+  linkedTransactionId?: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -61,7 +63,7 @@ const TransactionSchema = new Schema<TransactionDocument>(
     type: {
       type: String,
       enum: {
-        values: ['income', 'expense'],
+        values: ['income', 'expense', 'transfer'],
         message: '{VALUE} no es un tipo de transacción válido',
       },
       required: [true, 'El tipo de transacción es requerido'],
@@ -80,6 +82,16 @@ const TransactionSchema = new Schema<TransactionDocument>(
       type: String,
       trim: true,
       maxlength: [500, 'Las notas no pueden exceder 500 caracteres'],
+    },
+    subscriptionId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Subscription',
+      required: false,
+    },
+    linkedTransactionId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Transaction',
+      required: false,
     },
   },
   {

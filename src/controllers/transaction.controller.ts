@@ -87,9 +87,34 @@ export const deleteTransaction = async (req: Request, res: Response) => {
   // Revert account balance
   const account = await Account.findById(transaction.accountId);
   if (account) {
-    const amountReversal = transaction.type === 'income' ? -transaction.amount : transaction.amount;
-    account.balance += amountReversal;
+    if (transaction.type === 'transfer') {
+      // For transfers: check notes to determine direction
+      const isOutgoing = transaction.notes?.startsWith('Transferencia a');
+      account.balance += isOutgoing ? transaction.amount : -transaction.amount;
+    } else {
+      const amountReversal = transaction.type === 'income' ? -transaction.amount : transaction.amount;
+      account.balance += amountReversal;
+    }
     await account.save();
+  }
+
+  // If this is part of a transfer, also delete and revert the linked transaction
+  if (transaction.linkedTransactionId) {
+    const linked = await Transaction.findById(transaction.linkedTransactionId);
+    if (linked) {
+      const linkedAccount = await Account.findById(linked.accountId);
+      if (linkedAccount) {
+        if (linked.type === 'transfer') {
+          const isLinkedOutgoing = linked.notes?.startsWith('Transferencia a');
+          linkedAccount.balance += isLinkedOutgoing ? linked.amount : -linked.amount;
+        } else {
+          const linkedReversal = linked.type === 'income' ? -linked.amount : linked.amount;
+          linkedAccount.balance += linkedReversal;
+        }
+        await linkedAccount.save();
+      }
+      await linked.deleteOne();
+    }
   }
 
   await transaction.deleteOne();

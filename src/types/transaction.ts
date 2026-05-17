@@ -1,4 +1,4 @@
-export type TransactionType = 'income' | 'expense';
+export type TransactionType = 'income' | 'expense' | 'transfer';
 
 export type TransactionCategory = string;
 
@@ -21,6 +21,9 @@ export const TRANSACTION_CATEGORIES: { value: string; label: string; icon: strin
   { value: 'shopping', label: 'Compras', icon: '🛍️' },
   { value: 'travel', label: 'Viajes', icon: '✈️' },
   { value: 'personal', label: 'Personal', icon: '👤' },
+  { value: 'atm', label: 'Retiro Cajero', icon: '🏧' },
+  { value: 'delivery', label: 'Delivery', icon: '🏍️' },
+  { value: 'shipping', label: 'Pedidos / Envíos', icon: '🚚' },
   { value: 'other', label: 'Otro', icon: '📁' },
 ];
 
