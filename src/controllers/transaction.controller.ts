@@ -69,7 +69,7 @@ export const createTransaction = async (req: Request, res: Response) => {
 
   // Update account balance
   const amountChange = transaction.type === 'income' ? transaction.amount : -transaction.amount;
-  account.balance += amountChange;
+  account.balance = Math.round(account.balance + amountChange);
   await account.save();
 
   res.status(201).json({ success: true, data: transaction });
@@ -88,12 +88,11 @@ export const deleteTransaction = async (req: Request, res: Response) => {
   const account = await Account.findById(transaction.accountId);
   if (account) {
     if (transaction.type === 'transfer') {
-      // For transfers: check notes to determine direction
       const isOutgoing = transaction.notes?.startsWith('Transferencia a');
-      account.balance += isOutgoing ? transaction.amount : -transaction.amount;
+      account.balance = Math.round(account.balance + (isOutgoing ? transaction.amount : -transaction.amount));
     } else {
       const amountReversal = transaction.type === 'income' ? -transaction.amount : transaction.amount;
-      account.balance += amountReversal;
+      account.balance = Math.round(account.balance + amountReversal);
     }
     await account.save();
   }
@@ -106,10 +105,10 @@ export const deleteTransaction = async (req: Request, res: Response) => {
       if (linkedAccount) {
         if (linked.type === 'transfer') {
           const isLinkedOutgoing = linked.notes?.startsWith('Transferencia a');
-          linkedAccount.balance += isLinkedOutgoing ? linked.amount : -linked.amount;
+          linkedAccount.balance = Math.round(linkedAccount.balance + (isLinkedOutgoing ? linked.amount : -linked.amount));
         } else {
           const linkedReversal = linked.type === 'income' ? -linked.amount : linked.amount;
-          linkedAccount.balance += linkedReversal;
+          linkedAccount.balance = Math.round(linkedAccount.balance + linkedReversal);
         }
         await linkedAccount.save();
       }
@@ -235,4 +234,92 @@ export const deleteCategory = async (req: Request, res: Response) => {
   await category.deleteOne();
 
   res.status(200).json({ success: true, data: {} });
+};
+
+// @route   PUT /api/transactions/:id
+// @desc    Update a transaction (adjusts account balances accordingly)
+// @access  Private
+export const updateTransaction = async (req: Request, res: Response) => {
+  const transaction = await Transaction.findOne({ _id: req.params.id, userId: req.user?.id });
+  if (!transaction) {
+    return res.status(404).json({ success: false, error: 'Transaction not found' });
+  }
+
+  // Transfers are not editable via this endpoint
+  if (transaction.type === 'transfer') {
+    return res.status(400).json({ success: false, error: 'Las transferencias no se pueden editar directamente' });
+  }
+
+  const oldAccountId = transaction.accountId.toString();
+  const oldAmount = transaction.amount;
+  const oldType = transaction.type;
+
+  let { amount, originalCurrency, originalAmount, exchangeRate, accountId: newAccountId, ...rest } = req.body;
+
+  originalCurrency = (originalCurrency || 'CLP').toUpperCase();
+  originalAmount = parseFloat(originalAmount) || parseFloat(amount);
+
+  if (!originalAmount || originalAmount <= 0) {
+    return res.status(400).json({ success: false, error: 'El monto debe ser mayor a 0' });
+  }
+
+  let finalAmountCLP = 0;
+  let finalExchangeRate = parseFloat(exchangeRate) || 1;
+
+  if (originalCurrency === 'CLP') {
+    finalAmountCLP = Math.round(originalAmount);
+    finalExchangeRate = 1;
+  } else {
+    if (!req.body.exchangeRate) {
+      const conv = await convertToCLP(originalAmount, originalCurrency);
+      finalAmountCLP = conv.amountCLP;
+      finalExchangeRate = conv.exchangeRate;
+    } else {
+      finalAmountCLP = Math.round(originalAmount * finalExchangeRate);
+    }
+  }
+
+  const resolvedAccountId = newAccountId || oldAccountId;
+
+  // Verify the new account belongs to the user
+  const newAccount = await Account.findOne({ _id: resolvedAccountId, userId: req.user?.id });
+  if (!newAccount) {
+    return res.status(404).json({ success: false, error: 'Account not found' });
+  }
+
+  // ── Revert old balance ──────────────────────────────────────────────────
+  const oldAccount = resolvedAccountId !== oldAccountId
+    ? await Account.findOne({ _id: oldAccountId, userId: req.user?.id })
+    : newAccount;
+
+  if (oldAccount) {
+    // Undo the old transaction effect on the old account
+    const oldReversal = oldType === 'income' ? -oldAmount : oldAmount;
+    oldAccount.balance = Math.round(oldAccount.balance + oldReversal);
+    await oldAccount.save();
+  }
+
+  // ── Apply new balance ───────────────────────────────────────────────────
+  const newType = rest.type || oldType;
+  const newChange = newType === 'income' ? finalAmountCLP : -finalAmountCLP;
+
+  // If account changed, newAccount is already the fresh doc; otherwise it's the same as oldAccount (already reverted)
+  newAccount.balance = Math.round(newAccount.balance + newChange);
+  await newAccount.save();
+
+  // ── Update the transaction ──────────────────────────────────────────────
+  const updated = await Transaction.findByIdAndUpdate(
+    transaction._id,
+    {
+      ...rest,
+      accountId: resolvedAccountId,
+      originalCurrency,
+      originalAmount,
+      exchangeRate: finalExchangeRate,
+      amount: finalAmountCLP,
+    },
+    { new: true, runValidators: true },
+  );
+
+  res.status(200).json({ success: true, data: updated });
 };

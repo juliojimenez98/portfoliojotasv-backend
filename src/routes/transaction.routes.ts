@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getTransactions, createTransaction, deleteTransaction, getTransactionCategories, createCategory, updateCategory, deleteCategory } from '../controllers/transaction.controller';
+import { getTransactions, createTransaction, updateTransaction, deleteTransaction, getTransactionCategories, createCategory, updateCategory, deleteCategory } from '../controllers/transaction.controller';
 import { protect, authorize } from '../middlewares/auth';
 
 const router = Router();
@@ -20,6 +20,7 @@ router.route('/')
   .post(createTransaction);
 
 router.route('/:id')
+  .put(updateTransaction)
   .delete(deleteTransaction);
 
 export default router;

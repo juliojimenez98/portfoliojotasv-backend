@@ -64,7 +64,7 @@ export const depositToAccount = async (req: Request, res: Response) => {
   if (!account) return res.status(404).json({ success: false, error: 'Account not found' });
 
   // Update balance
-  account.balance += amount;
+  account.balance = Math.round(account.balance + amount);
   await account.save();
 
   // Create a transaction record for the deposit
@@ -105,8 +105,8 @@ export const transferBetweenAccounts = async (req: Request, res: Response) => {
   if (!toAccount) return res.status(404).json({ success: false, error: 'Destination account not found' });
 
   // Execute transfer (no balance check — credit cards can be negative)
-  fromAccount.balance -= amount;
-  toAccount.balance += amount;
+  fromAccount.balance = Math.round(fromAccount.balance - amount);
+  toAccount.balance = Math.round(toAccount.balance + amount);
 
   await fromAccount.save();
   await toAccount.save();
