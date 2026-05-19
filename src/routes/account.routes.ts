@@ -7,6 +7,7 @@ import {
   deleteAccount,
   depositToAccount,
   transferBetweenAccounts,
+  recalculateBalances,
 } from '../controllers/account.controller';
 import { protect, authorize } from '../middlewares/auth';
 
@@ -18,6 +19,9 @@ router.use(authorize('gastos'));
 
 // Transfer (must be before /:id routes)
 router.post('/transfer', transferBetweenAccounts);
+
+// Recalculate all balances from transactions (fix drift)
+router.post('/recalculate-balances', recalculateBalances);
 
 router.route('/')
   .get(getAccounts)

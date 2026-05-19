@@ -1,21 +1,29 @@
-import { Request, Response } from 'express';
-import Account from '../models/Account';
-import Transaction from '../models/Transaction';
+import { Request, Response } from "express";
+import Account from "../models/Account";
+import Transaction from "../models/Transaction";
 
 // @route   GET /api/accounts
 // @desc    Get all accounts for the current user
 // @access  Private (gastos app)
 export const getAccounts = async (req: Request, res: Response) => {
-  const accounts = await Account.find({ userId: req.user?.id }).sort({ name: 1 });
-  res.status(200).json({ success: true, count: accounts.length, data: accounts });
+  const accounts = await Account.find({ userId: req.user?.id }).sort({
+    name: 1,
+  });
+  res
+    .status(200)
+    .json({ success: true, count: accounts.length, data: accounts });
 };
 
 // @route   GET /api/accounts/:id
 // @desc    Get single account
 // @access  Private (gastos app)
 export const getAccount = async (req: Request, res: Response) => {
-  const account = await Account.findOne({ _id: req.params.id, userId: req.user?.id });
-  if (!account) return res.status(404).json({ success: false, error: 'Account not found' });
+  const account = await Account.findOne({
+    _id: req.params.id,
+    userId: req.user?.id,
+  });
+  if (!account)
+    return res.status(404).json({ success: false, error: "Account not found" });
   res.status(200).json({ success: true, data: account });
 };
 
@@ -35,9 +43,10 @@ export const updateAccount = async (req: Request, res: Response) => {
   const account = await Account.findOneAndUpdate(
     { _id: req.params.id, userId: req.user?.id },
     req.body,
-    { new: true, runValidators: true }
+    { new: true, runValidators: true },
   );
-  if (!account) return res.status(404).json({ success: false, error: 'Account not found' });
+  if (!account)
+    return res.status(404).json({ success: false, error: "Account not found" });
   res.status(200).json({ success: true, data: account });
 };
 
@@ -45,8 +54,12 @@ export const updateAccount = async (req: Request, res: Response) => {
 // @desc    Delete account
 // @access  Private (gastos app)
 export const deleteAccount = async (req: Request, res: Response) => {
-  const account = await Account.findOneAndDelete({ _id: req.params.id, userId: req.user?.id });
-  if (!account) return res.status(404).json({ success: false, error: 'Account not found' });
+  const account = await Account.findOneAndDelete({
+    _id: req.params.id,
+    userId: req.user?.id,
+  });
+  if (!account)
+    return res.status(404).json({ success: false, error: "Account not found" });
   res.status(200).json({ success: true, data: {} });
 };
 
@@ -57,24 +70,30 @@ export const depositToAccount = async (req: Request, res: Response) => {
   const { amount, description } = req.body;
 
   if (!amount || amount <= 0) {
-    return res.status(400).json({ success: false, error: 'Amount must be greater than 0' });
+    return res
+      .status(400)
+      .json({ success: false, error: "Amount must be greater than 0" });
   }
 
-  const account = await Account.findOne({ _id: req.params.id, userId: req.user?.id });
-  if (!account) return res.status(404).json({ success: false, error: 'Account not found' });
+  const account = await Account.findOne({
+    _id: req.params.id,
+    userId: req.user?.id,
+  });
+  if (!account)
+    return res.status(404).json({ success: false, error: "Account not found" });
 
   // Update balance
-  account.balance = Math.round(account.balance + amount);
+  account.balance = Math.round(Math.round(account.balance) + amount);
   await account.save();
 
   // Create a transaction record for the deposit
   await Transaction.create({
     accountId: account._id,
     userId: req.user?.id,
-    description: description || 'Depósito',
+    description: description || "Depósito",
     amount,
-    type: 'income',
-    category: 'other',
+    type: "income",
+    category: "other",
     date: new Date(),
     notes: `Abono a cuenta "${account.name}"`,
   });
@@ -89,29 +108,52 @@ export const transferBetweenAccounts = async (req: Request, res: Response) => {
   const { fromAccountId, toAccountId, amount, description } = req.body;
 
   if (!fromAccountId || !toAccountId) {
-    return res.status(400).json({ success: false, error: 'Both source and destination accounts are required' });
+    return res
+      .status(400)
+      .json({
+        success: false,
+        error: "Both source and destination accounts are required",
+      });
   }
   if (fromAccountId === toAccountId) {
-    return res.status(400).json({ success: false, error: 'Cannot transfer to the same account' });
+    return res
+      .status(400)
+      .json({ success: false, error: "Cannot transfer to the same account" });
   }
   if (!amount || amount <= 0) {
-    return res.status(400).json({ success: false, error: 'Amount must be greater than 0' });
+    return res
+      .status(400)
+      .json({ success: false, error: "Amount must be greater than 0" });
   }
 
-  const fromAccount = await Account.findOne({ _id: fromAccountId, userId: req.user?.id });
-  const toAccount = await Account.findOne({ _id: toAccountId, userId: req.user?.id });
+  const fromAccount = await Account.findOne({
+    _id: fromAccountId,
+    userId: req.user?.id,
+  });
+  const toAccount = await Account.findOne({
+    _id: toAccountId,
+    userId: req.user?.id,
+  });
 
-  if (!fromAccount) return res.status(404).json({ success: false, error: 'Source account not found' });
-  if (!toAccount) return res.status(404).json({ success: false, error: 'Destination account not found' });
+  if (!fromAccount)
+    return res
+      .status(404)
+      .json({ success: false, error: "Source account not found" });
+  if (!toAccount)
+    return res
+      .status(404)
+      .json({ success: false, error: "Destination account not found" });
 
   // Execute transfer (no balance check — credit cards can be negative)
-  fromAccount.balance = Math.round(fromAccount.balance - amount);
-  toAccount.balance = Math.round(toAccount.balance + amount);
+  fromAccount.balance = Math.round(Math.round(fromAccount.balance) - amount);
+  toAccount.balance = Math.round(Math.round(toAccount.balance) + amount);
 
   await fromAccount.save();
   await toAccount.save();
 
-  const transferDesc = description || `Transferencia de "${fromAccount.name}" a "${toAccount.name}"`;
+  const transferDesc =
+    description ||
+    `Transferencia de "${fromAccount.name}" a "${toAccount.name}"`;
 
   // Record outgoing transaction
   const outgoing = await Transaction.create({
@@ -120,10 +162,10 @@ export const transferBetweenAccounts = async (req: Request, res: Response) => {
     description: transferDesc,
     amount,
     originalAmount: amount,
-    originalCurrency: 'CLP',
+    originalCurrency: "CLP",
     exchangeRate: 1,
-    type: 'transfer',
-    category: 'transfer',
+    type: "transfer",
+    category: "transfer",
     date: new Date(),
     notes: `Transferencia a "${toAccount.name}"`,
   });
@@ -135,10 +177,10 @@ export const transferBetweenAccounts = async (req: Request, res: Response) => {
     description: transferDesc,
     amount,
     originalAmount: amount,
-    originalCurrency: 'CLP',
+    originalCurrency: "CLP",
     exchangeRate: 1,
-    type: 'transfer',
-    category: 'transfer',
+    type: "transfer",
+    category: "transfer",
     date: new Date(),
     notes: `Transferencia desde "${fromAccount.name}"`,
   });
@@ -156,4 +198,41 @@ export const transferBetweenAccounts = async (req: Request, res: Response) => {
       to: toAccount,
     },
   });
+};
+
+// @route   POST /api/accounts/recalculate-balances
+// @desc    Recalculate all account balances from transactions (fixes floating-point drift)
+// @access  Private
+export const recalculateBalances = async (req: Request, res: Response) => {
+  const accounts = await Account.find({ userId: req.user?.id });
+  const results: { accountId: string; name: string; oldBalance: number; newBalance: number }[] = [];
+
+  for (const account of accounts) {
+    const transactions = await Transaction.find({ accountId: account._id });
+
+    let newBalance = 0;
+    for (const txn of transactions) {
+      if (txn.type === 'income') {
+        newBalance += txn.amount;
+      } else if (txn.type === 'expense') {
+        newBalance -= txn.amount;
+      } else if (txn.type === 'transfer') {
+        const isOutgoing = txn.notes?.startsWith('Transferencia a');
+        if (isOutgoing) {
+          newBalance -= txn.amount;
+        } else {
+          newBalance += txn.amount;
+        }
+      }
+    }
+
+    newBalance = Math.round(newBalance);
+    const oldBalance = account.balance;
+    account.balance = newBalance;
+    await account.save();
+
+    results.push({ accountId: account._id.toString(), name: account.name, oldBalance, newBalance });
+  }
+
+  res.status(200).json({ success: true, data: results });
 };
