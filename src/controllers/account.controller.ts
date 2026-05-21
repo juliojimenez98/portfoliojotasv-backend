@@ -200,38 +200,50 @@ export const transferBetweenAccounts = async (req: Request, res: Response) => {
   });
 };
 
+// @route   GET /api/accounts/recalculate-balances/preview
+// @desc    Preview what rounding would do to each account balance (no changes applied)
+// @access  Private
+export const previewRoundBalances = async (req: Request, res: Response) => {
+  const accounts = await Account.find({ userId: req.user?.id });
+  const results = accounts.map((account) => {
+    const oldBalance = account.balance;
+    const newBalance = Math.round(oldBalance);
+    return {
+      accountId: account._id.toString(),
+      name: account.name,
+      oldBalance,
+      newBalance,
+      diff: newBalance - oldBalance,
+      hasChange: oldBalance !== newBalance,
+    };
+  });
+  res.status(200).json({ success: true, data: results });
+};
+
 // @route   POST /api/accounts/recalculate-balances
-// @desc    Recalculate all account balances from transactions (fixes floating-point drift)
+// @desc    Round all account balances to nearest integer to eliminate floating-point drift.
+//          This ONLY rounds the existing stored balance — it does NOT recalculate from transactions.
 // @access  Private
 export const recalculateBalances = async (req: Request, res: Response) => {
   const accounts = await Account.find({ userId: req.user?.id });
-  const results: { accountId: string; name: string; oldBalance: number; newBalance: number }[] = [];
+  const results: { accountId: string; name: string; oldBalance: number; newBalance: number; diff: number }[] = [];
 
   for (const account of accounts) {
-    const transactions = await Transaction.find({ accountId: account._id });
+    const oldBalance = account.balance;
+    const newBalance = Math.round(oldBalance);
 
-    let newBalance = 0;
-    for (const txn of transactions) {
-      if (txn.type === 'income') {
-        newBalance += txn.amount;
-      } else if (txn.type === 'expense') {
-        newBalance -= txn.amount;
-      } else if (txn.type === 'transfer') {
-        const isOutgoing = txn.notes?.startsWith('Transferencia a');
-        if (isOutgoing) {
-          newBalance -= txn.amount;
-        } else {
-          newBalance += txn.amount;
-        }
-      }
+    if (oldBalance !== newBalance) {
+      account.balance = newBalance;
+      await account.save();
     }
 
-    newBalance = Math.round(newBalance);
-    const oldBalance = account.balance;
-    account.balance = newBalance;
-    await account.save();
-
-    results.push({ accountId: account._id.toString(), name: account.name, oldBalance, newBalance });
+    results.push({
+      accountId: account._id.toString(),
+      name: account.name,
+      oldBalance,
+      newBalance,
+      diff: newBalance - oldBalance,
+    });
   }
 
   res.status(200).json({ success: true, data: results });

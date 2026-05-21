@@ -8,6 +8,7 @@ import {
   depositToAccount,
   transferBetweenAccounts,
   recalculateBalances,
+  previewRoundBalances,
 } from '../controllers/account.controller';
 import { protect, authorize } from '../middlewares/auth';
 
@@ -21,6 +22,7 @@ router.use(authorize('gastos'));
 router.post('/transfer', transferBetweenAccounts);
 
 // Recalculate all balances from transactions (fix drift)
+router.get('/recalculate-balances/preview', previewRoundBalances);
 router.post('/recalculate-balances', recalculateBalances);
 
 router.route('/')
