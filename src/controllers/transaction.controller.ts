@@ -31,12 +31,10 @@ export const createTransaction = async (req: Request, res: Response) => {
     userId: req.user?.id,
   });
   if (!account) {
-    return res
-      .status(404)
-      .json({
-        success: false,
-        error: "Account not found or belongs to another user",
-      });
+    return res.status(404).json({
+      success: false,
+      error: "Account not found or belongs to another user",
+    });
   }
 
   let { amount, originalCurrency, originalAmount, exchangeRate, ...rest } =
@@ -118,7 +116,9 @@ export const deleteTransaction = async (req: Request, res: Response) => {
         transaction.type === "income"
           ? -transaction.amount
           : transaction.amount;
-      account.balance = Math.round(Math.round(account.balance) + amountReversal);
+      account.balance = Math.round(
+        Math.round(account.balance) + amountReversal,
+      );
     }
     await account.save();
   }
@@ -206,12 +206,10 @@ export const createCategory = async (req: Request, res: Response) => {
   const { label, icon } = req.body;
 
   if (!label || !label.trim()) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        error: "El nombre de la categoría es requerido",
-      });
+    return res.status(400).json({
+      success: false,
+      error: "El nombre de la categoría es requerido",
+    });
   }
 
   const value = label
@@ -229,12 +227,10 @@ export const createCategory = async (req: Request, res: Response) => {
   // Check if value already exists for user
   const existing = await Category.findOne({ userId: req.user?.id, value });
   if (existing) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        error: "Ya existe una categoría con ese nombre",
-      });
+    return res.status(400).json({
+      success: false,
+      error: "Ya existe una categoría con ese nombre",
+    });
   }
 
   const category = await Category.create({
@@ -292,13 +288,10 @@ export const deleteCategory = async (req: Request, res: Response) => {
   }
 
   if (category.isDefault) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        error:
-          "No se pueden eliminar las categorías predeterminadas del sistema",
-      });
+    return res.status(400).json({
+      success: false,
+      error: "No se pueden eliminar las categorías predeterminadas del sistema",
+    });
   }
 
   await category.deleteOne();
@@ -322,12 +315,10 @@ export const updateTransaction = async (req: Request, res: Response) => {
 
   // Transfers are not editable via this endpoint
   if (transaction.type === "transfer") {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        error: "Las transferencias no se pueden editar directamente",
-      });
+    return res.status(400).json({
+      success: false,
+      error: "Las transferencias no se pueden editar directamente",
+    });
   }
 
   const oldAccountId = transaction.accountId.toString();
@@ -388,7 +379,9 @@ export const updateTransaction = async (req: Request, res: Response) => {
   if (oldAccount) {
     // Undo the old transaction effect on the old account
     const oldReversal = oldType === "income" ? -oldAmount : oldAmount;
-    oldAccount.balance = Math.round(Math.round(oldAccount.balance) + oldReversal);
+    oldAccount.balance = Math.round(
+      Math.round(oldAccount.balance) + oldReversal,
+    );
     await oldAccount.save();
   }
 

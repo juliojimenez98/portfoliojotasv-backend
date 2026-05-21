@@ -110,12 +110,10 @@ export const transferBetweenAccounts = async (req: Request, res: Response) => {
   const { fromAccountId, toAccountId, amount, description } = req.body;
 
   if (!fromAccountId || !toAccountId) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        error: "Both source and destination accounts are required",
-      });
+    return res.status(400).json({
+      success: false,
+      error: "Both source and destination accounts are required",
+    });
   }
   if (fromAccountId === toAccountId) {
     return res
@@ -232,7 +230,13 @@ export const previewRoundBalances = async (req: Request, res: Response) => {
 // @access  Private
 export const recalculateBalances = async (req: Request, res: Response) => {
   const accounts = await Account.find({ userId: req.user?.id });
-  const results: { accountId: string; name: string; oldBalance: number; newBalance: number; diff: number }[] = [];
+  const results: {
+    accountId: string;
+    name: string;
+    oldBalance: number;
+    newBalance: number;
+    diff: number;
+  }[] = [];
 
   for (const account of accounts) {
     const oldBalance = account.balance;
