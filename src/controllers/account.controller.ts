@@ -83,6 +83,7 @@ export const depositToAccount = async (req: Request, res: Response) => {
     return res.status(404).json({ success: false, error: "Account not found" });
 
   // Update balance
+  const balanceBeforeDeposit = Math.round(account.balance);
   account.balance = Math.round(Math.round(account.balance) + amount);
   await account.save();
 
@@ -96,6 +97,7 @@ export const depositToAccount = async (req: Request, res: Response) => {
     category: "other",
     date: new Date(),
     notes: `Abono a cuenta "${account.name}"`,
+    balanceBefore: balanceBeforeDeposit,
   });
 
   res.status(200).json({ success: true, data: account });
@@ -145,6 +147,8 @@ export const transferBetweenAccounts = async (req: Request, res: Response) => {
       .json({ success: false, error: "Destination account not found" });
 
   // Execute transfer (no balance check — credit cards can be negative)
+  const balanceBeforeFrom = Math.round(fromAccount.balance);
+  const balanceBeforeTo = Math.round(toAccount.balance);
   fromAccount.balance = Math.round(Math.round(fromAccount.balance) - amount);
   toAccount.balance = Math.round(Math.round(toAccount.balance) + amount);
 
@@ -168,6 +172,7 @@ export const transferBetweenAccounts = async (req: Request, res: Response) => {
     category: "transfer",
     date: new Date(),
     notes: `Transferencia a "${toAccount.name}"`,
+    balanceBefore: balanceBeforeFrom,
   });
 
   // Record incoming transaction
@@ -183,6 +188,7 @@ export const transferBetweenAccounts = async (req: Request, res: Response) => {
     category: "transfer",
     date: new Date(),
     notes: `Transferencia desde "${fromAccount.name}"`,
+    balanceBefore: balanceBeforeTo,
   });
 
   // Link both transactions to each other

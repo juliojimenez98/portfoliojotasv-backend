@@ -76,6 +76,7 @@ export const createTransaction = async (req: Request, res: Response) => {
     originalAmount,
     exchangeRate: finalExchangeRate,
     amount: finalAmountCLP,
+    balanceBefore: Math.round(account.balance),
   };
 
   const transaction = await Transaction.create(transactionData);

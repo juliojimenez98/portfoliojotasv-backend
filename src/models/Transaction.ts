@@ -15,6 +15,7 @@ export interface TransactionDocument extends Document {
   notes?: string;
   subscriptionId?: Types.ObjectId;
   linkedTransactionId?: Types.ObjectId;
+  balanceBefore?: number; // Account balance before this transaction was applied
   createdAt: Date;
   updatedAt: Date;
 }
@@ -91,6 +92,10 @@ const TransactionSchema = new Schema<TransactionDocument>(
     linkedTransactionId: {
       type: Schema.Types.ObjectId,
       ref: 'Transaction',
+      required: false,
+    },
+    balanceBefore: {
+      type: Number,
       required: false,
     },
   },
