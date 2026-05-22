@@ -56,7 +56,7 @@ const TransactionSchema = new Schema<TransactionDocument>(
     },
     originalAmount: {
       type: Number,
-      required: [true, "El monto original es requerido"],
+      required: false,
       min: [0.01, "El monto original debe ser mayor a 0"],
     },
     exchangeRate: {
