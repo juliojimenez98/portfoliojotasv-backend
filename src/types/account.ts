@@ -10,6 +10,7 @@ export interface IAccount {
   bankName?: string;
   currency: string;
   balance: number;
+  creditLimit?: number;
   color: string;
   icon: string;
   refreshType: RefreshType;
@@ -25,6 +26,7 @@ export interface CreateAccountInput {
   bankName?: string;
   currency?: string;
   balance?: number;
+  creditLimit?: number;
   color?: string;
   icon?: string;
   refreshType?: RefreshType;
@@ -37,6 +39,7 @@ export interface UpdateAccountInput {
   bankName?: string;
   currency?: string;
   balance?: number;
+  creditLimit?: number;
   color?: string;
   icon?: string;
   refreshType?: RefreshType;

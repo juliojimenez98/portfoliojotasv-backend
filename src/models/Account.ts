@@ -11,6 +11,7 @@ export interface AccountDocument extends Document {
   bankName?: string;
   currency: string;
   balance: number;
+  creditLimit?: number;
   color: string;
   icon: string;
   refreshType: RefreshType;
@@ -58,6 +59,10 @@ const AccountSchema = new Schema<AccountDocument>(
       uppercase: true,
     },
     balance: {
+      type: Number,
+      default: 0,
+    },
+    creditLimit: {
       type: Number,
       default: 0,
     },
