@@ -1,7 +1,12 @@
-import mongoose, { Schema, Document, Model, Types } from 'mongoose';
+import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
-export type AccountType = 'credit_card' | 'debit' | 'cash' | 'savings' | 'other';
-export type RefreshType = 'automatic' | 'manual';
+export type AccountType =
+  | "credit_card"
+  | "debit"
+  | "cash"
+  | "savings"
+  | "other";
+export type RefreshType = "automatic" | "manual";
 
 export interface AccountDocument extends Document {
   userId: Types.ObjectId;
@@ -11,6 +16,9 @@ export interface AccountDocument extends Document {
   bankName?: string;
   currency: string;
   balance: number;
+  creditLimit?: number;
+  internationalCreditLimit?: number; // Total international credit limit in USD
+  internationalBalance?: number; // Available international credit in USD
   color: string;
   icon: string;
   refreshType: RefreshType;
@@ -23,37 +31,37 @@ const AccountSchema = new Schema<AccountDocument>(
   {
     userId: {
       type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: [true, 'El usuario es requerido'],
+      ref: "User",
+      required: [true, "El usuario es requerido"],
       index: true,
     },
     name: {
       type: String,
-      required: [true, 'El nombre de la cuenta es requerido'],
+      required: [true, "El nombre de la cuenta es requerido"],
       trim: true,
-      maxlength: [100, 'El nombre no puede exceder 100 caracteres'],
+      maxlength: [100, "El nombre no puede exceder 100 caracteres"],
     },
     description: {
       type: String,
       trim: true,
-      maxlength: [300, 'La descripción no puede exceder 300 caracteres'],
+      maxlength: [300, "La descripción no puede exceder 300 caracteres"],
     },
     type: {
       type: String,
       enum: {
-        values: ['credit_card', 'debit', 'cash', 'savings', 'other'],
-        message: '{VALUE} no es un tipo de cuenta válido',
+        values: ["credit_card", "debit", "cash", "savings", "other"],
+        message: "{VALUE} no es un tipo de cuenta válido",
       },
-      required: [true, 'El tipo de cuenta es requerido'],
+      required: [true, "El tipo de cuenta es requerido"],
     },
     bankName: {
       type: String,
       trim: true,
-      maxlength: [100, 'El nombre del banco no puede exceder 100 caracteres'],
+      maxlength: [100, "El nombre del banco no puede exceder 100 caracteres"],
     },
     currency: {
       type: String,
-      default: 'CLP',
+      default: "CLP",
       trim: true,
       uppercase: true,
     },
@@ -61,21 +69,33 @@ const AccountSchema = new Schema<AccountDocument>(
       type: Number,
       default: 0,
     },
+    creditLimit: {
+      type: Number,
+      required: false,
+    },
+    internationalCreditLimit: {
+      type: Number,
+      required: false,
+    },
+    internationalBalance: {
+      type: Number,
+      required: false,
+    },
     color: {
       type: String,
-      default: '#6366f1', // indigo-500
+      default: "#6366f1", // indigo-500
     },
     icon: {
       type: String,
-      default: 'wallet',
+      default: "wallet",
     },
     refreshType: {
       type: String,
       enum: {
-        values: ['automatic', 'manual'],
-        message: '{VALUE} no es un tipo de refresco válido',
+        values: ["automatic", "manual"],
+        message: "{VALUE} no es un tipo de refresco válido",
       },
-      default: 'manual',
+      default: "manual",
     },
     isActive: {
       type: Boolean,
@@ -84,13 +104,14 @@ const AccountSchema = new Schema<AccountDocument>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Compound index for user + active queries
 AccountSchema.index({ userId: 1, isActive: 1 });
 
 const Account: Model<AccountDocument> =
-  mongoose.models.Account || mongoose.model<AccountDocument>('Account', AccountSchema);
+  mongoose.models.Account ||
+  mongoose.model<AccountDocument>("Account", AccountSchema);
 
 export default Account;

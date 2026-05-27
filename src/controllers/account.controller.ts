@@ -64,11 +64,74 @@ export const deleteAccount = async (req: Request, res: Response) => {
 };
 
 // @route   POST /api/accounts/:id/deposit
-// @desc    Deposit money into an account
+// @desc    Deposit money into an account (or restore international credit quota)
 // @access  Private (gastos app)
+//
+// Body:
+//   amount          – CLP amount to add to balance (regular credit payment)
+//   description     – optional label
+//   internationalAmountUSD – if present, restore this many USD to internationalBalance
+//   exchangeRate    – CLP per 1 USD paid (required when internationalAmountUSD is set)
 export const depositToAccount = async (req: Request, res: Response) => {
-  const { amount, description } = req.body;
+  const { amount, description, internationalAmountUSD, exchangeRate } =
+    req.body;
 
+  // internationalAmountUSD path: paying off international quota
+  if (internationalAmountUSD != null) {
+    if (internationalAmountUSD <= 0) {
+      return res
+        .status(400)
+        .json({ success: false, error: "El monto USD debe ser mayor a 0" });
+    }
+    if (!exchangeRate || exchangeRate <= 0) {
+      return res
+        .status(400)
+        .json({ success: false, error: "La tasa de cambio es requerida" });
+    }
+
+    const account = await Account.findOne({
+      _id: req.params.id,
+      userId: req.user?.id,
+    });
+    if (!account)
+      return res
+        .status(404)
+        .json({ success: false, error: "Account not found" });
+
+    const amountCLP = Math.round(internationalAmountUSD * exchangeRate);
+    const balanceBefore = Math.round(account.balance);
+    const intlBalanceBefore = account.internationalBalance ?? 0;
+
+    // Restore international quota
+    const newIntlBalance = Math.min(
+      account.internationalCreditLimit ?? 0,
+      intlBalanceBefore + internationalAmountUSD,
+    );
+    account.internationalBalance = newIntlBalance;
+
+    // Also restore main CLP balance by the equivalent CLP amount
+    account.balance = Math.round(account.balance + amountCLP);
+    await account.save();
+
+    await Transaction.create({
+      accountId: account._id,
+      userId: req.user?.id,
+      description: description || `Pago cupo internacional`,
+      amount: amountCLP,
+      originalAmount: internationalAmountUSD,
+      originalCurrency: "USD",
+      exchangeRate,
+      type: "income",
+      category: "other",
+      date: new Date(),
+      notes: `Pago de $${internationalAmountUSD} USD a cupo internacional (1 USD = ${exchangeRate.toLocaleString("es-CL")} CLP)`,
+      balanceBefore,
+    });
+
+    return res.status(200).json({ success: true, data: account });
+  }
+
+  // Regular deposit path
   if (!amount || amount <= 0) {
     return res
       .status(400)
