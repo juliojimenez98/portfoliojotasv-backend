@@ -6,6 +6,7 @@ export interface CategoryDocument extends Document {
   label: string;
   icon: string;
   isDefault: boolean;
+  limit?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +40,11 @@ const CategorySchema = new Schema<CategoryDocument>(
     isDefault: {
       type: Boolean,
       default: false,
+    },
+    limit: {
+      type: Number,
+      required: false,
+      default: null,
     },
   },
   {

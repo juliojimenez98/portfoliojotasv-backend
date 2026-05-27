@@ -203,7 +203,7 @@ export const getTransactionCategories = async (req: Request, res: Response) => {
 // @desc    Create new category
 // @access  Private
 export const createCategory = async (req: Request, res: Response) => {
-  const { label, icon } = req.body;
+  const { label, icon, limit } = req.body;
 
   if (!label || !label.trim()) {
     return res.status(400).json({
@@ -239,6 +239,7 @@ export const createCategory = async (req: Request, res: Response) => {
     label: label.trim(),
     icon: icon ? icon.trim() : "📁",
     isDefault: false,
+    limit: limit ? parseFloat(limit) : undefined,
   });
 
   res.status(201).json({ success: true, data: category });
@@ -248,7 +249,7 @@ export const createCategory = async (req: Request, res: Response) => {
 // @desc    Update category
 // @access  Private
 export const updateCategory = async (req: Request, res: Response) => {
-  const { label, icon } = req.body;
+  const { label, icon, limit } = req.body;
   const category = await Category.findOne({
     _id: req.params.id,
     userId: req.user?.id,
@@ -265,6 +266,9 @@ export const updateCategory = async (req: Request, res: Response) => {
   }
   if (icon && icon.trim()) {
     category.icon = icon.trim();
+  }
+  if (limit !== undefined) {
+    category.limit = limit ? parseFloat(limit) : undefined;
   }
 
   await category.save();

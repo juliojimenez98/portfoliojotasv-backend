@@ -38,6 +38,8 @@ export interface UserDocument extends Document {
   allowedApps: string[];
   isAdmin: boolean;
   paydayConfig?: PaydayConfig;
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -104,6 +106,14 @@ const UserSchema = new Schema<UserDocument>(
     paydayConfig: {
       type: PaydayConfigSchema,
       default: undefined,
+    },
+    resetPasswordToken: {
+      type: String,
+      select: false,
+    },
+    resetPasswordExpires: {
+      type: Date,
+      select: false,
     },
   },
   {

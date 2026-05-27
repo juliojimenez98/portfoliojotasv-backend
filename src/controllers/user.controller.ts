@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import User from '../models/User';
+import { sendInvitationEmail } from '../services/email.service';
 
 // @route   GET /api/users
 // @desc    Get all users
@@ -47,6 +48,11 @@ export const createUser = async (req: Request, res: Response) => {
     isAdmin: user.isAdmin,
     allowedApps: user.allowedApps,
   };
+
+  // Send invitation email in the background (non-blocking)
+  sendInvitationEmail(user.email, user.username, password).catch((emailErr) => {
+    console.error("Failed to send invitation email in background:", emailErr);
+  });
 
   res.status(201).json({ success: true, data: userResponse });
 };

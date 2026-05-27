@@ -12,7 +12,6 @@ import userRoutes from "./routes/user.routes";
 import currencyRoutes from "./routes/currency.routes";
 import profileRoutes from "./routes/profile.routes";
 import periodRoutes from "./routes/period.routes";
-import pollaRoutes from "./routes/polla.routes";
 
 dotenv.config();
 
@@ -37,7 +36,6 @@ app.use("/api/users", userRoutes);
 app.use("/api/currency", currencyRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/periods", periodRoutes);
-app.use("/api/polla", pollaRoutes);
 
 // Basic route
 app.get("/api/health", (req: Request, res: Response) => {
