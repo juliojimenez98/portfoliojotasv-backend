@@ -137,13 +137,14 @@ export const depositToAccount = async (req: Request, res: Response) => {
     account.balance = Math.round(account.balance + amountCLP);
     await account.save();
 
+    let outgoingTx = null;
     if (fromAccount) {
       const balanceBeforeFrom = Math.round(fromAccount.balance);
       fromAccount.balance = Math.round(fromAccount.balance - amountCLP);
       await fromAccount.save();
 
       // Create transaction for source account (recorded as transfer to prevent double counting expenses)
-      await Transaction.create({
+      outgoingTx = await Transaction.create({
         accountId: fromAccount._id,
         userId: req.user?.id,
         description: description || `Pago cupo internacional tarjeta ${account.name}`,
@@ -159,7 +160,7 @@ export const depositToAccount = async (req: Request, res: Response) => {
       });
     }
 
-    await Transaction.create({
+    const incomingTx = await Transaction.create({
       accountId: account._id,
       userId: req.user?.id,
       description: description || `Pago cupo internacional`,
@@ -173,6 +174,13 @@ export const depositToAccount = async (req: Request, res: Response) => {
       notes: `Pago de $${internationalAmountUSD} USD a cupo internacional (1 USD = ${finalExchangeRate.toLocaleString("es-CL")} CLP)${fromAccount ? ` desde ${fromAccount.name}` : ""}`,
       balanceBefore,
     });
+
+    if (outgoingTx && incomingTx.type === "transfer") {
+      outgoingTx.linkedTransactionId = incomingTx._id;
+      incomingTx.linkedTransactionId = outgoingTx._id;
+      await outgoingTx.save();
+      await incomingTx.save();
+    }
 
     return res.status(200).json({ success: true, data: account });
   }
@@ -216,13 +224,14 @@ export const depositToAccount = async (req: Request, res: Response) => {
   account.balance = Math.round(Math.round(account.balance) + amount);
   await account.save();
 
+  let outgoingTx = null;
   if (fromAccount) {
     const balanceBeforeFrom = Math.round(fromAccount.balance);
     fromAccount.balance = Math.round(fromAccount.balance - amount);
     await fromAccount.save();
 
     // Create transaction for source account (recorded as transfer to prevent double counting expenses)
-    await Transaction.create({
+    outgoingTx = await Transaction.create({
       accountId: fromAccount._id,
       userId: req.user?.id,
       description: description || `Pago tarjeta de crédito ${account.name}`,
@@ -236,7 +245,7 @@ export const depositToAccount = async (req: Request, res: Response) => {
   }
 
   // Create a transaction record for the deposit
-  await Transaction.create({
+  const incomingTx = await Transaction.create({
     accountId: account._id,
     userId: req.user?.id,
     description: description || "Depósito",
@@ -249,6 +258,13 @@ export const depositToAccount = async (req: Request, res: Response) => {
       : `Abono a cuenta "${account.name}"`,
     balanceBefore: balanceBeforeDeposit,
   });
+
+  if (outgoingTx && incomingTx.type === "transfer") {
+    outgoingTx.linkedTransactionId = incomingTx._id;
+    incomingTx.linkedTransactionId = outgoingTx._id;
+    await outgoingTx.save();
+    await incomingTx.save();
+  }
 
   res.status(200).json({ success: true, data: account });
 };

@@ -317,12 +317,57 @@ export const updateTransaction = async (req: Request, res: Response) => {
       .json({ success: false, error: "Transaction not found" });
   }
 
-  // Transfers are not editable via this endpoint
+  // Transfers update path
   if (transaction.type === "transfer") {
-    return res.status(400).json({
-      success: false,
-      error: "Las transferencias no se pueden editar directamente",
-    });
+    const { description, notes, date, originalAmount, amount } = req.body;
+    const oldAmount = transaction.amount;
+    const newAmount = amount ? Math.round(Number(amount)) : (originalAmount ? Math.round(Number(originalAmount)) : oldAmount);
+
+    const linked = transaction.linkedTransactionId
+      ? await Transaction.findById(transaction.linkedTransactionId)
+      : null;
+
+    if (description !== undefined) transaction.description = description;
+    if (notes !== undefined) transaction.notes = notes;
+    if (date !== undefined) transaction.date = new Date(date);
+
+    if (linked) {
+      if (description !== undefined) linked.description = description;
+      if (notes !== undefined) linked.notes = notes;
+      if (date !== undefined) linked.date = new Date(date);
+    }
+
+    if (newAmount !== oldAmount) {
+      const diff = newAmount - oldAmount;
+
+      const account = await Account.findById(transaction.accountId);
+      if (account) {
+        const isOutgoing = transaction.notes?.includes("Transferencia a") || transaction.notes?.includes("Pago de") || transaction.notes?.includes("Pago tarjeta") || transaction.description?.toLowerCase().includes("pago tarjeta");
+        const adjustment = isOutgoing ? -diff : diff;
+        account.balance = Math.round(Math.round(account.balance) + adjustment);
+        await account.save();
+      }
+
+      if (linked) {
+        const linkedAccount = await Account.findById(linked.accountId);
+        if (linkedAccount) {
+          const isLinkedOutgoing = linked.notes?.includes("Transferencia a") || linked.notes?.includes("Pago de") || linked.notes?.includes("Pago tarjeta") || linked.description?.toLowerCase().includes("pago tarjeta");
+          const linkedAdjustment = isLinkedOutgoing ? -diff : diff;
+          linkedAccount.balance = Math.round(Math.round(linkedAccount.balance) + linkedAdjustment);
+          await linkedAccount.save();
+        }
+
+        linked.amount = newAmount;
+        linked.originalAmount = originalAmount ? Number(originalAmount) : newAmount;
+        await linked.save();
+      }
+
+      transaction.amount = newAmount;
+      transaction.originalAmount = originalAmount ? Number(originalAmount) : newAmount;
+    }
+
+    await transaction.save();
+    return res.status(200).json({ success: true, data: transaction });
   }
 
   const oldAccountId = transaction.accountId.toString();
