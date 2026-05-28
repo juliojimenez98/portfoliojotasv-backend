@@ -304,3 +304,157 @@ export const sendResetPasswordEmail = async (
 
   return sendEmail(email, "Recupera tu contraseña en JJ Apps 🔑", html);
 };
+
+// Send payday reminder email notification
+export const sendPaydayReminderEmail = async (
+  email: string,
+  username: string,
+  paydayConfig: any,
+) => {
+  const gastosUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/app/gastos`;
+  const formattedAmount = paydayConfig.amount
+    ? new Intl.NumberFormat("es-CL", {
+        style: "currency",
+        currency: paydayConfig.currency || "CLP",
+        maximumFractionDigits: 0,
+      }).format(paydayConfig.amount)
+    : null;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Recordatorio: Día de Pago Configurado</title>
+        <style>
+          body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+          }
+          .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #1e293b;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid #334155;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+          }
+          .header {
+            background: linear-gradient(135deg, #0d9488 0%, #3b82f6 100%);
+            padding: 40px 20px;
+            text-align: center;
+          }
+          .header h1 {
+            color: #ffffff;
+            margin: 0;
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+          }
+          .content {
+            padding: 40px 30px;
+          }
+          .content p {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #cbd5e1;
+            margin: 0 0 20px 0;
+          }
+          .details-box {
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 30px 0;
+          }
+          .details-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 15px;
+          }
+          .details-row:last-child {
+            margin-bottom: 0;
+          }
+          .label {
+            color: #94a3b8;
+            font-weight: 500;
+          }
+          .value {
+            color: #f8fafc;
+            font-weight: 700;
+          }
+          .btn-container {
+            text-align: center;
+            margin: 30px 0 10px 0;
+          }
+          .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #0d9488 0%, #3b82f6 100%);
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 14px 30px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 15px;
+            box-shadow: 0 4px 14px 0 rgba(13, 148, 136, 0.4);
+            transition: all 0.2s ease;
+          }
+          .footer {
+            background-color: #182235;
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid #334155;
+            font-size: 12px;
+            color: #64748b;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>¡Hoy es tu Día de Pago! 💵🎉</h1>
+          </div>
+          <div class="content">
+            <p>Hola, <strong>${username}</strong>,</p>
+            <p>Te escribimos para recordarte que hoy es tu día de pago configurado en tu panel de control de gastos.</p>
+            
+            <p>Por seguridad y para darte el control absoluto de tus finanzas, <strong>este abono no se realiza automáticamente en tu saldo</strong>. Debes iniciar un nuevo período de gastos de forma manual para archivar tus movimientos anteriores y arrancar en limpio.</p>
+            
+            <div class="details-box">
+              <div class="details-row">
+                <span class="label">Detalle:</span>
+                <span class="value">${paydayConfig.label || "Sueldo principal"}</span>
+              </div>
+              ${formattedAmount ? `
+              <div class="details-row">
+                <span class="label">Monto esperado:</span>
+                <span class="value">${formattedAmount}</span>
+              </div>` : ""}
+            </div>
+
+            <p><strong>¿Qué debes hacer ahora?</strong></p>
+            <p>Ingresa al panel de gastos y presiona el botón <strong>"Recibí mi Pago"</strong> en el banner superior. Esto creará el abono en tu cuenta configurada de manera inmediata y abrirá tu nuevo ciclo.</p>
+            
+            <div class="btn-container">
+              <a href="${gastosUrl}" class="btn">Ir al Dashboard de Gastos</a>
+            </div>
+          </div>
+          <div class="footer">
+            Este correo es automático, por favor no respondas a él.<br>
+            &copy; ${new Date().getFullYear()} JJ Apps. Todos los derechos reservados.
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  return sendEmail(email, "💵 ¡Hoy es tu día de pago! Registra tu sueldo", html);
+};
+

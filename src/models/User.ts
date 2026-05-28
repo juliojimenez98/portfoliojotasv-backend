@@ -40,6 +40,7 @@ export interface UserDocument extends Document {
   paydayConfig?: PaydayConfig;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
+  lastPaydayEmailSent?: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -114,6 +115,10 @@ const UserSchema = new Schema<UserDocument>(
     resetPasswordExpires: {
       type: Date,
       select: false,
+    },
+    lastPaydayEmailSent: {
+      type: Date,
+      required: false,
     },
   },
   {

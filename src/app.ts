@@ -12,13 +12,18 @@ import userRoutes from "./routes/user.routes";
 import currencyRoutes from "./routes/currency.routes";
 import profileRoutes from "./routes/profile.routes";
 import periodRoutes from "./routes/period.routes";
+import { checkAndSendPaydayEmails } from "./services/paydayScheduler";
 
 dotenv.config();
 
 // Connect to database
 connectDB().then(() => {
   // Execute database migrations/seeds once DB is connected
-  runMigrations();
+  runMigrations().then(() => {
+    // Start payday scheduler check on startup, then check every 6 hours
+    checkAndSendPaydayEmails();
+    setInterval(checkAndSendPaydayEmails, 6 * 60 * 60 * 1000);
+  });
 });
 
 const app = express();
