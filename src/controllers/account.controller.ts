@@ -83,10 +83,17 @@ export const depositToAccount = async (req: Request, res: Response) => {
         .status(400)
         .json({ success: false, error: "El monto USD debe ser mayor a 0" });
     }
-    if (!exchangeRate || exchangeRate <= 0) {
+    const amountCLP = amount != null ? Math.round(amount) : (exchangeRate ? Math.round(internationalAmountUSD * exchangeRate) : 0);
+    if (amountCLP <= 0) {
       return res
         .status(400)
-        .json({ success: false, error: "La tasa de cambio es requerida" });
+        .json({ success: false, error: "El monto en CLP debe ser mayor a 0" });
+    }
+    const finalExchangeRate = exchangeRate || (internationalAmountUSD > 0 ? amountCLP / internationalAmountUSD : 0);
+    if (finalExchangeRate <= 0) {
+      return res
+        .status(400)
+        .json({ success: false, error: "La tasa de cambio o el monto en CLP es requerido" });
     }
 
     const account = await Account.findOne({
@@ -116,7 +123,6 @@ export const depositToAccount = async (req: Request, res: Response) => {
       }
     }
 
-    const amountCLP = Math.round(internationalAmountUSD * exchangeRate);
     const balanceBefore = Math.round(account.balance);
     const intlBalanceBefore = account.internationalBalance ?? 0;
 
@@ -144,7 +150,7 @@ export const depositToAccount = async (req: Request, res: Response) => {
         amount: amountCLP,
         originalAmount: internationalAmountUSD,
         originalCurrency: "USD",
-        exchangeRate,
+        exchangeRate: finalExchangeRate,
         type: "transfer",
         category: "transfer",
         date: new Date(),
@@ -160,11 +166,11 @@ export const depositToAccount = async (req: Request, res: Response) => {
       amount: amountCLP,
       originalAmount: internationalAmountUSD,
       originalCurrency: "USD",
-      exchangeRate,
+      exchangeRate: finalExchangeRate,
       type: fromAccount ? "transfer" : "income",
       category: fromAccount ? "transfer" : "other",
       date: new Date(),
-      notes: `Pago de $${internationalAmountUSD} USD a cupo internacional (1 USD = ${exchangeRate.toLocaleString("es-CL")} CLP)${fromAccount ? ` desde ${fromAccount.name}` : ""}`,
+      notes: `Pago de $${internationalAmountUSD} USD a cupo internacional (1 USD = ${finalExchangeRate.toLocaleString("es-CL")} CLP)${fromAccount ? ` desde ${fromAccount.name}` : ""}`,
       balanceBefore,
     });
 
