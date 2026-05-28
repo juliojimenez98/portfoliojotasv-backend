@@ -24,6 +24,7 @@ export const TRANSACTION_CATEGORIES: { value: string; label: string; icon: strin
   { value: 'atm', label: 'Retiro Cajero', icon: '🏧' },
   { value: 'delivery', label: 'Delivery', icon: '🏍️' },
   { value: 'shipping', label: 'Pedidos / Envíos', icon: '🚚' },
+  { value: 'abono_tarjeta', label: 'Abono a tarjeta credito', icon: '💳' },
   { value: 'other', label: 'Otro', icon: '📁' },
 ];
 

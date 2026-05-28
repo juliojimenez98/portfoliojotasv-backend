@@ -106,7 +106,7 @@ export const deleteTransaction = async (req: Request, res: Response) => {
   const account = await Account.findById(transaction.accountId);
   if (account) {
     if (transaction.type === "transfer") {
-      const isOutgoing = transaction.notes?.startsWith("Transferencia a");
+      const isOutgoing = transaction.notes?.includes("Transferencia a") || transaction.notes?.includes("Pago de") || transaction.notes?.includes("Pago tarjeta") || transaction.description?.toLowerCase().includes("pago tarjeta");
       account.balance = Math.round(
         Math.round(account.balance) +
           (isOutgoing ? transaction.amount : -transaction.amount),
@@ -130,7 +130,7 @@ export const deleteTransaction = async (req: Request, res: Response) => {
       const linkedAccount = await Account.findById(linked.accountId);
       if (linkedAccount) {
         if (linked.type === "transfer") {
-          const isLinkedOutgoing = linked.notes?.startsWith("Transferencia a");
+          const isLinkedOutgoing = linked.notes?.includes("Transferencia a") || linked.notes?.includes("Pago de") || linked.notes?.includes("Pago tarjeta") || linked.description?.toLowerCase().includes("pago tarjeta");
           linkedAccount.balance = Math.round(
             Math.round(linkedAccount.balance) +
               (isLinkedOutgoing ? linked.amount : -linked.amount),
@@ -317,8 +317,8 @@ export const updateTransaction = async (req: Request, res: Response) => {
       .json({ success: false, error: "Transaction not found" });
   }
 
-  // Transfers update path
-  if (transaction.type === "transfer") {
+  // Transfers/linked transactions update path
+  if (transaction.type === "transfer" || transaction.linkedTransactionId) {
     const { description, notes, date, originalAmount, amount } = req.body;
     const oldAmount = transaction.amount;
     const newAmount = amount ? Math.round(Number(amount)) : (originalAmount ? Math.round(Number(originalAmount)) : oldAmount);

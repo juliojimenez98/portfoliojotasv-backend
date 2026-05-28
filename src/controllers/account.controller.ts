@@ -73,7 +73,7 @@ export const deleteAccount = async (req: Request, res: Response) => {
 //   internationalAmountUSD – if present, restore this many USD to internationalBalance
 //   exchangeRate    – CLP per 1 USD paid (required when internationalAmountUSD is set)
 export const depositToAccount = async (req: Request, res: Response) => {
-  const { amount, description, internationalAmountUSD, exchangeRate, fromAccountId } =
+  const { amount, description, internationalAmountUSD, exchangeRate, fromAccountId, isExpense } =
     req.body;
 
   // internationalAmountUSD path: paying off international quota
@@ -143,7 +143,7 @@ export const depositToAccount = async (req: Request, res: Response) => {
       fromAccount.balance = Math.round(fromAccount.balance - amountCLP);
       await fromAccount.save();
 
-      // Create transaction for source account (recorded as transfer to prevent double counting expenses)
+      // Create transaction for source account
       outgoingTx = await Transaction.create({
         accountId: fromAccount._id,
         userId: req.user?.id,
@@ -152,8 +152,8 @@ export const depositToAccount = async (req: Request, res: Response) => {
         originalAmount: internationalAmountUSD,
         originalCurrency: "USD",
         exchangeRate: finalExchangeRate,
-        type: "transfer",
-        category: "transfer",
+        type: isExpense ? "expense" : "transfer",
+        category: isExpense ? "abono_tarjeta" : "transfer",
         date: new Date(),
         notes: `Pago de cupo internacional a tarjeta "${account.name}"`,
         balanceBefore: balanceBeforeFrom,
@@ -230,14 +230,14 @@ export const depositToAccount = async (req: Request, res: Response) => {
     fromAccount.balance = Math.round(fromAccount.balance - amount);
     await fromAccount.save();
 
-    // Create transaction for source account (recorded as transfer to prevent double counting expenses)
+    // Create transaction for source account
     outgoingTx = await Transaction.create({
       accountId: fromAccount._id,
       userId: req.user?.id,
       description: description || `Pago tarjeta de crédito ${account.name}`,
       amount,
-      type: "transfer",
-      category: "transfer",
+      type: isExpense ? "expense" : "transfer",
+      category: isExpense ? "abono_tarjeta" : "transfer",
       date: new Date(),
       notes: `Pago de tarjeta de crédito "${account.name}"`,
       balanceBefore: balanceBeforeFrom,
