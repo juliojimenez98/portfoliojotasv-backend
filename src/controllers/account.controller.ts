@@ -73,8 +73,10 @@ export const deleteAccount = async (req: Request, res: Response) => {
 //   internationalAmountUSD – if present, restore this many USD to internationalBalance
 //   exchangeRate    – CLP per 1 USD paid (required when internationalAmountUSD is set)
 export const depositToAccount = async (req: Request, res: Response) => {
-  const { amount, description, internationalAmountUSD, exchangeRate, fromAccountId, isExpense } =
+  const { amount, description, internationalAmountUSD, exchangeRate, fromAccountId } =
     req.body;
+  // Default isExpense to true for credit card payments — abonos are always expenses
+  const isExpense = req.body.isExpense !== undefined ? req.body.isExpense : true;
 
   // internationalAmountUSD path: paying off international quota
   if (internationalAmountUSD != null) {
