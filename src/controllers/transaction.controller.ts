@@ -161,16 +161,36 @@ export const getTransactionCategories = async (req: Request, res: Response) => {
     createdAt: 1,
   });
 
-  // If user has no categories, seed the default ones
-  if (categories.length === 0) {
-    const defaultCats = TRANSACTION_CATEGORIES.map((c) => ({
-      userId: req.user?.id,
-      value: c.value,
-      label: c.label,
-      icon: c.icon,
-      isDefault: true,
-    }));
-    categories = (await Category.insertMany(defaultCats)) as any;
+  // Ensure all default categories are present and matching latest definitions
+  const existingCatsMap = new Map(categories.map((c) => [c.value, c]));
+  let hasChanges = false;
+
+  for (const defaultCat of TRANSACTION_CATEGORIES) {
+    const existing = existingCatsMap.get(defaultCat.value);
+    if (!existing) {
+      const newCat = await Category.create({
+        userId: req.user?.id,
+        value: defaultCat.value,
+        label: defaultCat.label,
+        icon: defaultCat.icon,
+        isDefault: true,
+      });
+      categories.push(newCat);
+      hasChanges = true;
+    } else if (!existing.isDefault || existing.label !== defaultCat.label || existing.icon !== defaultCat.icon) {
+      existing.isDefault = true;
+      existing.label = defaultCat.label;
+      existing.icon = defaultCat.icon;
+      await existing.save();
+      hasChanges = true;
+    }
+  }
+
+  if (hasChanges) {
+    // Re-fetch sorted to maintain clean order
+    categories = await Category.find({ userId: req.user?.id }).sort({
+      createdAt: 1,
+    });
   }
 
   // Also check if there are any old custom categories in Transaction collection not in Category collection
