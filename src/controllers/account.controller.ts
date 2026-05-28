@@ -73,7 +73,7 @@ export const deleteAccount = async (req: Request, res: Response) => {
 //   internationalAmountUSD – if present, restore this many USD to internationalBalance
 //   exchangeRate    – CLP per 1 USD paid (required when internationalAmountUSD is set)
 export const depositToAccount = async (req: Request, res: Response) => {
-  const { amount, description, internationalAmountUSD, exchangeRate } =
+  const { amount, description, internationalAmountUSD, exchangeRate, fromAccountId } =
     req.body;
 
   // internationalAmountUSD path: paying off international quota
@@ -105,6 +105,17 @@ export const depositToAccount = async (req: Request, res: Response) => {
       });
     }
 
+    let fromAccount = null;
+    if (fromAccountId) {
+      fromAccount = await Account.findOne({
+        _id: fromAccountId,
+        userId: req.user?.id,
+      });
+      if (!fromAccount) {
+        return res.status(404).json({ success: false, error: "Cuenta de origen no encontrada" });
+      }
+    }
+
     const amountCLP = Math.round(internationalAmountUSD * exchangeRate);
     const balanceBefore = Math.round(account.balance);
     const intlBalanceBefore = account.internationalBalance ?? 0;
@@ -120,6 +131,28 @@ export const depositToAccount = async (req: Request, res: Response) => {
     account.balance = Math.round(account.balance + amountCLP);
     await account.save();
 
+    if (fromAccount) {
+      const balanceBeforeFrom = Math.round(fromAccount.balance);
+      fromAccount.balance = Math.round(fromAccount.balance - amountCLP);
+      await fromAccount.save();
+
+      // Create transaction for source account
+      await Transaction.create({
+        accountId: fromAccount._id,
+        userId: req.user?.id,
+        description: description || `Pago cupo internacional tarjeta ${account.name}`,
+        amount: amountCLP,
+        originalAmount: internationalAmountUSD,
+        originalCurrency: "USD",
+        exchangeRate,
+        type: "expense",
+        category: "other",
+        date: new Date(),
+        notes: `Pago de cupo internacional a tarjeta "${account.name}"`,
+        balanceBefore: balanceBeforeFrom,
+      });
+    }
+
     await Transaction.create({
       accountId: account._id,
       userId: req.user?.id,
@@ -131,7 +164,7 @@ export const depositToAccount = async (req: Request, res: Response) => {
       type: "income",
       category: "other",
       date: new Date(),
-      notes: `Pago de $${internationalAmountUSD} USD a cupo internacional (1 USD = ${exchangeRate.toLocaleString("es-CL")} CLP)`,
+      notes: `Pago de $${internationalAmountUSD} USD a cupo internacional (1 USD = ${exchangeRate.toLocaleString("es-CL")} CLP)${fromAccount ? ` desde ${fromAccount.name}` : ""}`,
       balanceBefore,
     });
 
@@ -161,10 +194,40 @@ export const depositToAccount = async (req: Request, res: Response) => {
     });
   }
 
+  let fromAccount = null;
+  if (fromAccountId) {
+    fromAccount = await Account.findOne({
+      _id: fromAccountId,
+      userId: req.user?.id,
+    });
+    if (!fromAccount) {
+      return res.status(404).json({ success: false, error: "Cuenta de origen no encontrada" });
+    }
+  }
+
   // Update balance
   const balanceBeforeDeposit = Math.round(account.balance);
   account.balance = Math.round(Math.round(account.balance) + amount);
   await account.save();
+
+  if (fromAccount) {
+    const balanceBeforeFrom = Math.round(fromAccount.balance);
+    fromAccount.balance = Math.round(fromAccount.balance - amount);
+    await fromAccount.save();
+
+    // Create transaction for source account
+    await Transaction.create({
+      accountId: fromAccount._id,
+      userId: req.user?.id,
+      description: description || `Pago tarjeta de crédito ${account.name}`,
+      amount,
+      type: "expense",
+      category: "other",
+      date: new Date(),
+      notes: `Pago de tarjeta de crédito "${account.name}"`,
+      balanceBefore: balanceBeforeFrom,
+    });
+  }
 
   // Create a transaction record for the deposit
   await Transaction.create({
@@ -175,7 +238,9 @@ export const depositToAccount = async (req: Request, res: Response) => {
     type: "income",
     category: "other",
     date: new Date(),
-    notes: `Abono a cuenta "${account.name}"`,
+    notes: fromAccount 
+      ? `Abono desde cuenta "${fromAccount.name}"` 
+      : `Abono a cuenta "${account.name}"`,
     balanceBefore: balanceBeforeDeposit,
   });
 
