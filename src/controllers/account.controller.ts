@@ -136,7 +136,7 @@ export const depositToAccount = async (req: Request, res: Response) => {
       fromAccount.balance = Math.round(fromAccount.balance - amountCLP);
       await fromAccount.save();
 
-      // Create transaction for source account
+      // Create transaction for source account (recorded as transfer to prevent double counting expenses)
       await Transaction.create({
         accountId: fromAccount._id,
         userId: req.user?.id,
@@ -145,8 +145,8 @@ export const depositToAccount = async (req: Request, res: Response) => {
         originalAmount: internationalAmountUSD,
         originalCurrency: "USD",
         exchangeRate,
-        type: "expense",
-        category: "other",
+        type: "transfer",
+        category: "transfer",
         date: new Date(),
         notes: `Pago de cupo internacional a tarjeta "${account.name}"`,
         balanceBefore: balanceBeforeFrom,
@@ -161,8 +161,8 @@ export const depositToAccount = async (req: Request, res: Response) => {
       originalAmount: internationalAmountUSD,
       originalCurrency: "USD",
       exchangeRate,
-      type: "income",
-      category: "other",
+      type: fromAccount ? "transfer" : "income",
+      category: fromAccount ? "transfer" : "other",
       date: new Date(),
       notes: `Pago de $${internationalAmountUSD} USD a cupo internacional (1 USD = ${exchangeRate.toLocaleString("es-CL")} CLP)${fromAccount ? ` desde ${fromAccount.name}` : ""}`,
       balanceBefore,
@@ -215,14 +215,14 @@ export const depositToAccount = async (req: Request, res: Response) => {
     fromAccount.balance = Math.round(fromAccount.balance - amount);
     await fromAccount.save();
 
-    // Create transaction for source account
+    // Create transaction for source account (recorded as transfer to prevent double counting expenses)
     await Transaction.create({
       accountId: fromAccount._id,
       userId: req.user?.id,
       description: description || `Pago tarjeta de crédito ${account.name}`,
       amount,
-      type: "expense",
-      category: "other",
+      type: "transfer",
+      category: "transfer",
       date: new Date(),
       notes: `Pago de tarjeta de crédito "${account.name}"`,
       balanceBefore: balanceBeforeFrom,
@@ -235,8 +235,8 @@ export const depositToAccount = async (req: Request, res: Response) => {
     userId: req.user?.id,
     description: description || "Depósito",
     amount,
-    type: "income",
-    category: "other",
+    type: fromAccount ? "transfer" : "income",
+    category: fromAccount ? "transfer" : "other",
     date: new Date(),
     notes: fromAccount 
       ? `Abono desde cuenta "${fromAccount.name}"` 
