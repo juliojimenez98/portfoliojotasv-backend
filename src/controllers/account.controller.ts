@@ -98,6 +98,13 @@ export const depositToAccount = async (req: Request, res: Response) => {
         .status(404)
         .json({ success: false, error: "Account not found" });
 
+    if (account.type !== "credit_card") {
+      return res.status(400).json({
+        success: false,
+        error: "El cupo internacional solo se aplica a tarjetas de crédito",
+      });
+    }
+
     const amountCLP = Math.round(internationalAmountUSD * exchangeRate);
     const balanceBefore = Math.round(account.balance);
     const intlBalanceBefore = account.internationalBalance ?? 0;
@@ -144,6 +151,15 @@ export const depositToAccount = async (req: Request, res: Response) => {
   });
   if (!account)
     return res.status(404).json({ success: false, error: "Account not found" });
+
+  // Only allow credit cards to receive abonos, unless it's a salary deposit
+  const isSalary = description && typeof description === "string" && description.toLowerCase().includes("sueldo");
+  if (account.type !== "credit_card" && !isSalary) {
+    return res.status(400).json({
+      success: false,
+      error: "Solo se puede abonar a tarjetas de crédito. Para otras cuentas, utiliza transferencias.",
+    });
+  }
 
   // Update balance
   const balanceBeforeDeposit = Math.round(account.balance);
@@ -206,6 +222,13 @@ export const transferBetweenAccounts = async (req: Request, res: Response) => {
     return res
       .status(404)
       .json({ success: false, error: "Destination account not found" });
+
+  if (toAccount.type === "credit_card") {
+    return res.status(400).json({
+      success: false,
+      error: "No se puede transferir a una tarjeta de crédito. Utiliza la función de abonar.",
+    });
+  }
 
   // Execute transfer (no balance check — credit cards can be negative)
   const balanceBeforeFrom = Math.round(fromAccount.balance);
