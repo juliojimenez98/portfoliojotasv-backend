@@ -75,8 +75,6 @@ export const deleteAccount = async (req: Request, res: Response) => {
 export const depositToAccount = async (req: Request, res: Response) => {
   const { amount, description, internationalAmountUSD, exchangeRate, fromAccountId } =
     req.body;
-  // Default isExpense to true for credit card payments — abonos are always expenses
-  const isExpense = req.body.isExpense !== undefined ? req.body.isExpense : true;
 
   // internationalAmountUSD path: paying off international quota
   if (internationalAmountUSD != null) {
@@ -154,8 +152,8 @@ export const depositToAccount = async (req: Request, res: Response) => {
         originalAmount: internationalAmountUSD,
         originalCurrency: "USD",
         exchangeRate: finalExchangeRate,
-        type: isExpense ? "expense" : "transfer",
-        category: isExpense ? "abono_tarjeta" : "transfer",
+        type: account.type === "credit_card" ? "expense" : "transfer",
+        category: account.type === "credit_card" ? "abono_tarjeta" : "transfer",
         date: new Date(),
         notes: `Pago de cupo internacional a tarjeta "${account.name}"`,
         balanceBefore: balanceBeforeFrom,
@@ -238,8 +236,8 @@ export const depositToAccount = async (req: Request, res: Response) => {
       userId: req.user?.id,
       description: description || `Pago tarjeta de crédito ${account.name}`,
       amount,
-      type: isExpense ? "expense" : "transfer",
-      category: isExpense ? "abono_tarjeta" : "transfer",
+      type: account.type === "credit_card" ? "expense" : "transfer",
+      category: account.type === "credit_card" ? "abono_tarjeta" : "transfer",
       date: new Date(),
       notes: `Pago de tarjeta de crédito "${account.name}"`,
       balanceBefore: balanceBeforeFrom,
