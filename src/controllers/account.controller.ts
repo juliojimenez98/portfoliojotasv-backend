@@ -377,46 +377,139 @@ export const transferBetweenAccounts = async (req: Request, res: Response) => {
   });
 };
 
-// @route   GET /api/accounts/recalculate-balances/preview
-// @desc    Preview what rounding would do to each account balance (no changes applied)
-// @access  Private
 export const previewRoundBalances = async (req: Request, res: Response) => {
   const accounts = await Account.find({ userId: req.user?.id });
-  const results = accounts.map((account) => {
-    const oldBalance = account.balance;
-    const newBalance = Math.round(oldBalance);
-    return {
+  const results = [];
+
+  for (const account of accounts) {
+    const txs = await Transaction.find({ accountId: account._id }).sort({ date: 1, createdAt: 1 });
+    if (txs.length === 0) {
+      results.push({
+        accountId: account._id.toString(),
+        name: account.name,
+        oldBalance: account.balance,
+        newBalance: Math.round(account.balance),
+        diff: Math.round(account.balance) - account.balance,
+        hasChange: Math.round(account.balance) !== account.balance,
+      });
+      continue;
+    }
+
+    let txEffectSum = 0;
+    for (const t of txs) {
+      let effect = 0;
+      if (t.type === "income") {
+        effect = t.amount;
+      } else if (t.type === "expense") {
+        effect = -t.amount;
+      } else if (t.type === "transfer") {
+        const notes = (t.notes || "").toLowerCase();
+        const isIncoming = notes.includes("desde");
+        effect = isIncoming ? t.amount : -t.amount;
+      }
+      txEffectSum += effect;
+    }
+
+    let startingBalance = txs[0].balanceBefore;
+    if (startingBalance === undefined || startingBalance === null) {
+      startingBalance = Math.round(account.balance - txEffectSum);
+    }
+
+    let currentBalance = startingBalance;
+    for (const t of txs) {
+      let effect = 0;
+      if (t.type === "income") {
+        effect = t.amount;
+      } else if (t.type === "expense") {
+        effect = -t.amount;
+      } else if (t.type === "transfer") {
+        const notes = (t.notes || "").toLowerCase();
+        const isIncoming = notes.includes("desde");
+        effect = isIncoming ? t.amount : -t.amount;
+      }
+      currentBalance = Math.round(currentBalance + effect);
+    }
+
+    results.push({
       accountId: account._id.toString(),
       name: account.name,
-      oldBalance,
-      newBalance,
-      diff: newBalance - oldBalance,
-      hasChange: oldBalance !== newBalance,
-    };
-  });
+      oldBalance: account.balance,
+      newBalance: currentBalance,
+      diff: currentBalance - account.balance,
+      hasChange: account.balance !== currentBalance,
+    });
+  }
+
   res.status(200).json({ success: true, data: results });
 };
 
 // @route   POST /api/accounts/recalculate-balances
-// @desc    Round all account balances to nearest integer to eliminate floating-point drift.
-//          This ONLY rounds the existing stored balance — it does NOT recalculate from transactions.
+// @desc    Recalculate all account balances based on their transactions history
 // @access  Private
 export const recalculateBalances = async (req: Request, res: Response) => {
   const accounts = await Account.find({ userId: req.user?.id });
-  const results: {
-    accountId: string;
-    name: string;
-    oldBalance: number;
-    newBalance: number;
-    diff: number;
-  }[] = [];
+  const results = [];
 
   for (const account of accounts) {
-    const oldBalance = account.balance;
-    const newBalance = Math.round(oldBalance);
+    const txs = await Transaction.find({ accountId: account._id }).sort({ date: 1, createdAt: 1 });
+    if (txs.length === 0) {
+      const oldBalance = account.balance;
+      const newBalance = Math.round(oldBalance);
+      if (oldBalance !== newBalance) {
+        account.balance = newBalance;
+        await account.save();
+      }
+      results.push({
+        accountId: account._id.toString(),
+        name: account.name,
+        oldBalance,
+        newBalance: newBalance,
+        diff: newBalance - oldBalance,
+      });
+      continue;
+    }
 
-    if (oldBalance !== newBalance) {
-      account.balance = newBalance;
+    let txEffectSum = 0;
+    for (const t of txs) {
+      let effect = 0;
+      if (t.type === "income") {
+        effect = t.amount;
+      } else if (t.type === "expense") {
+        effect = -t.amount;
+      } else if (t.type === "transfer") {
+        const notes = (t.notes || "").toLowerCase();
+        const isIncoming = notes.includes("desde");
+        effect = isIncoming ? t.amount : -t.amount;
+      }
+      txEffectSum += effect;
+    }
+
+    let startingBalance = txs[0].balanceBefore;
+    if (startingBalance === undefined || startingBalance === null) {
+      startingBalance = Math.round(account.balance - txEffectSum);
+    }
+
+    let currentBalance = startingBalance;
+    for (const t of txs) {
+      t.balanceBefore = currentBalance;
+      await t.save();
+
+      let effect = 0;
+      if (t.type === "income") {
+        effect = t.amount;
+      } else if (t.type === "expense") {
+        effect = -t.amount;
+      } else if (t.type === "transfer") {
+        const notes = (t.notes || "").toLowerCase();
+        const isIncoming = notes.includes("desde");
+        effect = isIncoming ? t.amount : -t.amount;
+      }
+      currentBalance = Math.round(currentBalance + effect);
+    }
+
+    const oldBalance = account.balance;
+    if (oldBalance !== currentBalance) {
+      account.balance = currentBalance;
       await account.save();
     }
 
@@ -424,8 +517,8 @@ export const recalculateBalances = async (req: Request, res: Response) => {
       accountId: account._id.toString(),
       name: account.name,
       oldBalance,
-      newBalance,
-      diff: newBalance - oldBalance,
+      newBalance: currentBalance,
+      diff: currentBalance - oldBalance,
     });
   }
 
