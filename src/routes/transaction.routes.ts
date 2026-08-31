@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   getTransactions,
   createTransaction,
+  createBulkTransactions,
   updateTransaction,
   deleteTransaction,
   getTransactionCategories,
@@ -19,6 +20,8 @@ router.use(authorize("gastos"));
 router.route("/categories").get(getTransactionCategories).post(createCategory);
 
 router.route("/categories/:id").put(updateCategory).delete(deleteCategory);
+
+router.post("/bulk", createBulkTransactions);
 
 router.route("/").get(getTransactions).post(createTransaction);
 

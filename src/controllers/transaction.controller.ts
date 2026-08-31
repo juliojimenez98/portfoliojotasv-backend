@@ -88,6 +88,125 @@ export const createTransaction = async (req: Request, res: Response) => {
   res.status(201).json({ success: true, data: transaction });
 };
 
+// @route   POST /api/transactions/bulk
+// @desc    Create multiple transactions in batch for a specific account
+// @access  Private
+export const createBulkTransactions = async (req: Request, res: Response) => {
+  const { accountId, transactions } = req.body;
+
+  if (!accountId) {
+    return res.status(400).json({
+      success: false,
+      error: "La cuenta es requerida para la carga masiva",
+    });
+  }
+
+  if (!Array.isArray(transactions) || transactions.length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: "Se requiere al menos una transacción para registrar",
+    });
+  }
+
+  // Verify account belongs to user
+  const account = await Account.findOne({
+    _id: accountId,
+    userId: req.user?.id,
+  });
+
+  if (!account) {
+    return res.status(404).json({
+      success: false,
+      error: "Cuenta no encontrada o no pertenece al usuario",
+    });
+  }
+
+  const createdTransactions = [];
+  let runningBalance = Math.round(account.balance);
+
+  for (const item of transactions) {
+    let {
+      description,
+      amount,
+      originalAmount,
+      originalCurrency,
+      exchangeRate,
+      category,
+      date,
+      notes,
+      type = "expense",
+    } = item;
+
+    originalCurrency = (originalCurrency || account.currency || "CLP").toUpperCase();
+    originalAmount = parseFloat(originalAmount) || parseFloat(amount);
+
+    if (!originalAmount || originalAmount <= 0) {
+      continue; // Skip invalid or zero amount rows
+    }
+
+    let finalAmountCLP = 0;
+    let finalExchangeRate = parseFloat(exchangeRate) || 1;
+
+    if (originalCurrency === "CLP") {
+      finalAmountCLP = Math.round(originalAmount);
+      finalExchangeRate = 1;
+    } else {
+      if (!exchangeRate) {
+        try {
+          const conv = await convertToCLP(originalAmount, originalCurrency);
+          finalAmountCLP = conv.amountCLP;
+          finalExchangeRate = conv.exchangeRate;
+        } catch {
+          finalAmountCLP = Math.round(originalAmount * finalExchangeRate);
+        }
+      } else {
+        finalAmountCLP = Math.round(originalAmount * finalExchangeRate);
+      }
+    }
+
+    const txDate = date ? new Date(date) : new Date();
+    const balanceBefore = runningBalance;
+    const amountChange = type === "income" ? finalAmountCLP : -finalAmountCLP;
+    runningBalance = Math.round(runningBalance + amountChange);
+
+    const doc = await Transaction.create({
+      userId: req.user?.id,
+      accountId: account._id,
+      description: (description || "Gasto").trim(),
+      amount: finalAmountCLP,
+      originalAmount,
+      originalCurrency,
+      exchangeRate: finalExchangeRate,
+      type,
+      category: (category || "other").trim(),
+      date: isNaN(txDate.getTime()) ? new Date() : txDate,
+      notes: notes ? notes.trim() : undefined,
+      balanceBefore,
+    });
+
+    createdTransactions.push(doc);
+  }
+
+  if (createdTransactions.length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: "No se encontraron filas con montos válidos para registrar",
+    });
+  }
+
+  // Update final account balance
+  account.balance = runningBalance;
+  await account.save();
+
+  res.status(201).json({
+    success: true,
+    count: createdTransactions.length,
+    data: createdTransactions,
+    account,
+  });
+};
+
+
 // @route   DELETE /api/transactions/:id
 // @desc    Delete transaction
 // @access  Private
