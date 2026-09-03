@@ -73,8 +73,17 @@ export const deleteAccount = async (req: Request, res: Response) => {
 //   internationalAmountUSD – if present, restore this many USD to internationalBalance
 //   exchangeRate    – CLP per 1 USD paid (required when internationalAmountUSD is set)
 export const depositToAccount = async (req: Request, res: Response) => {
-  const { amount, description, internationalAmountUSD, exchangeRate, fromAccountId } =
-    req.body;
+  const {
+    amount,
+    description,
+    internationalAmountUSD,
+    exchangeRate,
+    fromAccountId,
+    date,
+  } = req.body;
+
+  const depositDate = date ? new Date(date) : new Date();
+  const txDate = isNaN(depositDate.getTime()) ? new Date() : depositDate;
 
   // internationalAmountUSD path: paying off international quota
   if (internationalAmountUSD != null) {
@@ -154,7 +163,7 @@ export const depositToAccount = async (req: Request, res: Response) => {
         exchangeRate: finalExchangeRate,
         type: account.type === "credit_card" ? "expense" : "transfer",
         category: account.type === "credit_card" ? "abono_tarjeta" : "transfer",
-        date: new Date(),
+        date: txDate,
         notes: `Pago de cupo internacional a tarjeta "${account.name}"`,
         balanceBefore: balanceBeforeFrom,
       });
@@ -170,7 +179,7 @@ export const depositToAccount = async (req: Request, res: Response) => {
       exchangeRate: finalExchangeRate,
       type: fromAccount ? "transfer" : "income",
       category: fromAccount ? "transfer" : "other",
-      date: new Date(),
+      date: txDate,
       notes: `Pago de $${internationalAmountUSD} USD a cupo internacional (1 USD = ${finalExchangeRate.toLocaleString("es-CL")} CLP)${fromAccount ? ` desde ${fromAccount.name}` : ""}`,
       balanceBefore,
     });
@@ -238,7 +247,7 @@ export const depositToAccount = async (req: Request, res: Response) => {
       amount,
       type: account.type === "credit_card" ? "expense" : "transfer",
       category: account.type === "credit_card" ? "abono_tarjeta" : "transfer",
-      date: new Date(),
+      date: txDate,
       notes: `Pago de tarjeta de crédito "${account.name}"`,
       balanceBefore: balanceBeforeFrom,
     });
@@ -252,7 +261,7 @@ export const depositToAccount = async (req: Request, res: Response) => {
     amount,
     type: fromAccount ? "transfer" : "income",
     category: fromAccount ? "transfer" : "other",
-    date: new Date(),
+    date: txDate,
     notes: fromAccount 
       ? `Abono desde cuenta "${fromAccount.name}"` 
       : `Abono a cuenta "${account.name}"`,
