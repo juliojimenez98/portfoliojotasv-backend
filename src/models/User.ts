@@ -41,6 +41,10 @@ export interface UserDocument extends Document {
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
   lastPaydayEmailSent?: Date;
+  telegramChatId?: string;
+  telegramLinkCode?: string;
+  telegramLinkExpires?: Date;
+  defaultSnoozeMinutes?: number;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -119,6 +123,25 @@ const UserSchema = new Schema<UserDocument>(
     lastPaydayEmailSent: {
       type: Date,
       required: false,
+    },
+    telegramChatId: {
+      type: String,
+      required: false,
+      sparse: true,
+    },
+    telegramLinkCode: {
+      type: String,
+      required: false,
+    },
+    telegramLinkExpires: {
+      type: Date,
+      required: false,
+    },
+    defaultSnoozeMinutes: {
+      type: Number,
+      default: 15,
+      min: 1,
+      max: 1440,
     },
   },
   {

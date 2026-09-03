@@ -36,19 +36,30 @@ export const runMigrations = async () => {
           adminUser.isAdmin = true;
           modified = true;
         }
-        if (!adminUser.allowedApps.includes('gastos')) {
-          adminUser.allowedApps.push('gastos');
+        if (!adminUser.allowedApps.includes("gastos")) {
+          adminUser.allowedApps.push("gastos");
           modified = true;
         }
-        
+        if (!adminUser.allowedApps.includes("remedios")) {
+          adminUser.allowedApps.push("remedios");
+          modified = true;
+        }
+
         if (modified) {
           await adminUser.save();
-          console.log('[Migration] Permisos del usuario administrador actualizados.');
+          console.log("[Migration] Permisos del usuario administrador actualizados.");
         } else {
-          console.log('[Migration] Usuario administrador verificado.');
+          console.log("[Migration] Usuario administrador verificado.");
         }
       }
     }
+
+    // 2. Otorgar acceso a la app 'remedios' a todos los usuarios existentes
+    await User.updateMany(
+      { allowedApps: { $ne: "remedios" } },
+      { $addToSet: { allowedApps: "remedios" } },
+    );
+    console.log("[Migration] Acceso a 'remedios' otorgado a todos los usuarios.");
 
     // Aquí se pueden añadir futuras migraciones (ej: agregar nuevas columnas a documentos existentes)
     // ...

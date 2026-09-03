@@ -1,6 +1,8 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import "express-async-errors"; // Handles async errors in Express 4
 import { connectDB } from "./config/db";
 import { runMigrations } from "./config/migrate";
@@ -12,7 +14,12 @@ import userRoutes from "./routes/user.routes";
 import currencyRoutes from "./routes/currency.routes";
 import profileRoutes from "./routes/profile.routes";
 import periodRoutes from "./routes/period.routes";
+import remedyRoutes from "./routes/remedy.routes";
+import telegramWebhookRoutes from "./routes/telegramWebhook.routes";
 import { checkAndSendPaydayEmails } from "./services/paydayScheduler";
+import { checkAndSendReminders } from "./services/remedyScheduler";
+import { startTelegramPolling } from "./services/telegramService";
+import { processTelegramUpdate } from "./controllers/telegramWebhook.controller";
 
 dotenv.config();
 
@@ -23,6 +30,13 @@ connectDB().then(() => {
     // Start payday scheduler check on startup, then check every 6 hours
     checkAndSendPaydayEmails();
     setInterval(checkAndSendPaydayEmails, 6 * 60 * 60 * 1000);
+
+    // Start remedy scheduler check on startup, then check every 1 minute
+    checkAndSendReminders();
+    setInterval(checkAndSendReminders, 60 * 1000);
+
+    // Start Telegram Polling for receiving commands and button callbacks
+    startTelegramPolling(processTelegramUpdate);
   });
 });
 
@@ -41,6 +55,8 @@ app.use("/api/users", userRoutes);
 app.use("/api/currency", currencyRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/periods", periodRoutes);
+app.use("/api/remedies", remedyRoutes);
+app.use("/api/telegram", telegramWebhookRoutes);
 
 // Basic route
 app.get("/api/health", (req: Request, res: Response) => {
