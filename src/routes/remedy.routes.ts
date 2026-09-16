@@ -6,6 +6,8 @@ import {
   updateRemedy,
   deleteRemedy,
   executeAction,
+  pauseRemedy,
+  resumeRemedy,
   getLogs,
   generateTelegramLinkCode,
   getTelegramStatus,
@@ -27,5 +29,7 @@ router.post("/telegram/unlink", unlinkTelegram);
 
 router.route("/:id").put(updateRemedy).delete(deleteRemedy);
 router.post("/:id/action", executeAction);
+router.post("/:id/pause", pauseRemedy);
+router.post("/:id/resume", resumeRemedy);
 
 export default router;

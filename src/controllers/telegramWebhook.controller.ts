@@ -6,6 +6,7 @@ import {
   answerCallbackQuery,
   editTelegramMessage,
   sendSkipReasonOptions,
+  sendPauseDurationOptions,
   sendTelegramTextMessage,
 } from "../services/telegramService";
 
@@ -222,6 +223,80 @@ export const processTelegramUpdate = async (update: any) => {
         );
 
         await answerCallbackQuery(callbackQueryId, "Dosis omitida registrada");
+        return;
+      }
+
+      // ACTION: PAUSE ASK (Show duration options)
+      if (actionType === "pause_ask") {
+        await sendPauseDurationOptions(chatId, messageId, remedyId, remedy.name);
+        await answerCallbackQuery(callbackQueryId);
+        return;
+      }
+
+      // ACTION: PAUSE CANCEL (Return to normal reminder view)
+      if (actionType === "pause_cancel") {
+        const user = await User.findById(remedy.userId);
+        const snoozeMinutes = remedy.snoozeMinutes || user?.defaultSnoozeMinutes || 15;
+        await answerCallbackQuery(callbackQueryId, "Pausa cancelada");
+        await editTelegramMessage(
+          chatId,
+          messageId,
+          `💊 <b>RECORDATORIO DE REMEDIO</b>\n\n` +
+            `• <b>Nombre:</b> ${remedy.name}\n` +
+            `• <b>Dosis:</b> <code>${remedy.dose}</code>\n` +
+            (remedy.instructions ? `• <b>Notas:</b> ${remedy.instructions}\n` : "") +
+            `\n¿Qué deseas hacer?`,
+        );
+        return;
+      }
+
+      // ACTION: PAUSE DURATION SELECTED
+      if (actionType === "pause_duration") {
+        const durationType = extra[0] || "indefinite";
+        const now = new Date();
+        let pausedUntil: Date | null = null;
+        let periodLabel = "indefinidamente";
+
+        if (durationType === "1d") {
+          pausedUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+          periodLabel = `hasta el ${pausedUntil.toLocaleString("es-CL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`;
+        } else if (durationType === "3d") {
+          pausedUntil = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+          periodLabel = `por 3 días (hasta el ${pausedUntil.toLocaleString("es-CL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })})`;
+        } else if (durationType === "7d") {
+          pausedUntil = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+          periodLabel = `por 1 semana (hasta el ${pausedUntil.toLocaleString("es-CL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })})`;
+        }
+
+        remedy.isActive = false;
+        remedy.pausedUntil = pausedUntil;
+        remedy.pauseReason = `Pausado desde Telegram (${periodLabel})`;
+        remedy.reminderState = {
+          status: "pending",
+          snoozeCount: 0,
+        };
+        await remedy.save();
+
+        await RemedyLog.create({
+          userId: remedy.userId,
+          remedyId: remedy._id,
+          remedyName: remedy.name,
+          scheduledFor: scheduledFor || now,
+          action: "paused",
+          actionAt: now,
+          skipReason: `Pausado ${periodLabel}`,
+        });
+
+        await editTelegramMessage(
+          chatId,
+          messageId,
+          `⏸️ <b>MEDICACIÓN PAUSADA</b>\n\n` +
+            `• <b>Remedio:</b> ${remedy.name}\n` +
+            `• <b>Estado:</b> Pausado ${periodLabel}.\n\n` +
+            `<i>Los recordatorios no se enviarán durante este período. Puedes reactivarla en cualquier momento desde la web.</i>`,
+        );
+
+        await answerCallbackQuery(callbackQueryId, `Medicación pausada ${periodLabel}`);
         return;
       }
     }

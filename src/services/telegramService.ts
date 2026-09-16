@@ -113,6 +113,12 @@ export async function sendMedicationReminder(
           callback_data: `skip_ask:${remedyId}`,
         },
       ],
+      [
+        {
+          text: "⏸️ Pausar medicación",
+          callback_data: `pause_ask:${remedyId}`,
+        },
+      ],
     ],
   };
 
@@ -157,6 +163,12 @@ export async function sendRepeatReminder(
         {
           text: "❌ No puedo tomarlo hoy",
           callback_data: `skip_ask:${remedyId}`,
+        },
+      ],
+      [
+        {
+          text: "⏸️ Pausar medicación",
+          callback_data: `pause_ask:${remedyId}`,
         },
       ],
     ],
@@ -205,6 +217,60 @@ export async function sendSkipReasonOptions(
         {
           text: "✏️ Otra razón",
           callback_data: `skip_reason:${remedyId}:Otro motivo`,
+        },
+      ],
+    ],
+  };
+
+  return sendTelegramRequest("editMessageText", {
+    chat_id: chatId,
+    message_id: messageId,
+    text,
+    parse_mode: "HTML",
+    reply_markup: keyboard,
+  });
+}
+
+export async function sendPauseDurationOptions(
+  chatId: string,
+  messageId: number,
+  remedyId: string,
+  remedyName: string,
+) {
+  const text =
+    `⏸️ <b>PAUSAR MEDICACIÓN: ${remedyName}</b>\n\n` +
+    `¿Por cuánto tiempo deseas pausar los recordatorios de este medicamento?`;
+
+  const keyboard = {
+    inline_keyboard: [
+      [
+        {
+          text: "⏸️ 1 día (24 horas)",
+          callback_data: `pause_duration:${remedyId}:1d`,
+        },
+      ],
+      [
+        {
+          text: "⏸️ 3 días",
+          callback_data: `pause_duration:${remedyId}:3d`,
+        },
+      ],
+      [
+        {
+          text: "⏸️ 1 semana (7 días)",
+          callback_data: `pause_duration:${remedyId}:7d`,
+        },
+      ],
+      [
+        {
+          text: "⏸️ Indefinidamente (hasta reactivar en la web)",
+          callback_data: `pause_duration:${remedyId}:indefinite`,
+        },
+      ],
+      [
+        {
+          text: "⬅️ Cancelar / Volver",
+          callback_data: `pause_cancel:${remedyId}`,
         },
       ],
     ],

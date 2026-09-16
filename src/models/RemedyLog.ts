@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
-export type LogAction = "taken" | "skipped" | "snoozed";
+export type LogAction = "taken" | "skipped" | "snoozed" | "paused" | "resumed";
 
 export interface RemedyLogDocument extends Document {
   userId: Types.ObjectId;
@@ -38,7 +38,7 @@ const RemedyLogSchema = new Schema<RemedyLogDocument>(
     },
     action: {
       type: String,
-      enum: ["taken", "skipped", "snoozed"],
+      enum: ["taken", "skipped", "snoozed", "paused", "resumed"],
       required: true,
     },
     actionAt: {

@@ -93,6 +93,8 @@ export const updateRemedy = async (req: Request, res: Response) => {
     nextDoseAt,
     snoozeMinutes,
     isActive,
+    pausedUntil,
+    pauseReason,
   } = req.body;
 
   const remedy = await Remedy.findOne({ _id: id, userId });
@@ -105,7 +107,22 @@ export const updateRemedy = async (req: Request, res: Response) => {
   if (instructions !== undefined) remedy.instructions = instructions;
   if (frequencyHours !== undefined) remedy.frequencyHours = Number(frequencyHours);
   if (snoozeMinutes !== undefined) remedy.snoozeMinutes = Number(snoozeMinutes);
-  if (isActive !== undefined) remedy.isActive = Boolean(isActive);
+  if (isActive !== undefined) {
+    remedy.isActive = Boolean(isActive);
+    if (remedy.isActive) {
+      remedy.pausedUntil = null;
+      remedy.pauseReason = undefined;
+    }
+  }
+  if (pausedUntil !== undefined) {
+    if (pausedUntil === null || pausedUntil === "") {
+      remedy.pausedUntil = null;
+    } else {
+      const parsed = new Date(pausedUntil);
+      if (!isNaN(parsed.getTime())) remedy.pausedUntil = parsed;
+    }
+  }
+  if (pauseReason !== undefined) remedy.pauseReason = pauseReason;
 
   if (nextDoseAt) {
     const parsedDate = new Date(nextDoseAt);
@@ -120,6 +137,103 @@ export const updateRemedy = async (req: Request, res: Response) => {
 
   await remedy.save();
   return res.json({ success: true, remedy });
+};
+
+export const pauseRemedy = async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const { id } = req.params;
+  const { pausedUntil, reason } = req.body;
+
+  const remedy = await Remedy.findOne({ _id: id, userId });
+  if (!remedy) {
+    return res.status(404).json({ success: false, error: "Remedio no encontrado" });
+  }
+
+  let parsedDate: Date | null = null;
+  if (pausedUntil) {
+    const d = new Date(pausedUntil);
+    if (!isNaN(d.getTime())) {
+      parsedDate = d;
+    }
+  }
+
+  const defaultReason = parsedDate
+    ? `Pausado hasta el ${parsedDate.toLocaleString("es-CL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`
+    : "Pausado indefinidamente";
+
+  remedy.isActive = false;
+  remedy.pausedUntil = parsedDate;
+  remedy.pauseReason = reason || defaultReason;
+  remedy.reminderState = {
+    status: "pending",
+    snoozeCount: 0,
+  };
+  await remedy.save();
+
+  await RemedyLog.create({
+    userId,
+    remedyId: remedy._id,
+    remedyName: remedy.name,
+    scheduledFor: remedy.nextDoseAt,
+    action: "paused",
+    actionAt: new Date(),
+    skipReason: remedy.pauseReason,
+  });
+
+  return res.json({
+    success: true,
+    message: parsedDate
+      ? `Medicación pausada hasta ${parsedDate.toLocaleString("es-CL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`
+      : "Medicación pausada indefinidamente",
+    remedy,
+  });
+};
+
+export const resumeRemedy = async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const { id } = req.params;
+  const { nextDoseAt } = req.body;
+
+  const remedy = await Remedy.findOne({ _id: id, userId });
+  if (!remedy) {
+    return res.status(404).json({ success: false, error: "Remedio no encontrado" });
+  }
+
+  const now = new Date();
+  remedy.isActive = true;
+  remedy.pausedUntil = null;
+  remedy.pauseReason = undefined;
+
+  if (nextDoseAt) {
+    const parsed = new Date(nextDoseAt);
+    if (!isNaN(parsed.getTime())) {
+      remedy.nextDoseAt = parsed;
+    }
+  } else if (new Date(remedy.nextDoseAt) <= now) {
+    remedy.nextDoseAt = now;
+  }
+
+  remedy.reminderState = {
+    status: "pending",
+    snoozeCount: 0,
+  };
+  await remedy.save();
+
+  await RemedyLog.create({
+    userId,
+    remedyId: remedy._id,
+    remedyName: remedy.name,
+    scheduledFor: remedy.nextDoseAt,
+    action: "resumed",
+    actionAt: now,
+    skipReason: "Medicación reanudada manualmente",
+  });
+
+  return res.json({
+    success: true,
+    message: "Medicación reanudada con éxito",
+    remedy,
+  });
 };
 
 export const deleteRemedy = async (req: Request, res: Response) => {

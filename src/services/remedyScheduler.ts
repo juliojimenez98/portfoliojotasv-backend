@@ -1,13 +1,62 @@
 import Remedy from "../models/Remedy";
+import RemedyLog from "../models/RemedyLog";
 import User, { UserDocument } from "../models/User";
 import {
   sendMedicationReminder,
   sendRepeatReminder,
+  sendTelegramTextMessage,
 } from "./telegramService";
 
 export async function checkAndSendReminders() {
   try {
     const now = new Date();
+
+    // 0. Auto-resume remedies whose pause duration has expired
+    const expiredPausedRemedies = await Remedy.find({
+      isActive: false,
+      pausedUntil: { $ne: null, $lte: now },
+    }).populate<{ userId: UserDocument }>("userId");
+
+    for (const remedy of expiredPausedRemedies) {
+      console.log(
+        `[RemedyScheduler] ▶️ Reanudando automáticamente ${remedy.name} (período de pausa cumplido)`,
+      );
+      remedy.isActive = true;
+      remedy.pausedUntil = null;
+      remedy.pauseReason = undefined;
+
+      if (new Date(remedy.nextDoseAt) <= now) {
+        remedy.nextDoseAt = now;
+      }
+
+      remedy.reminderState = {
+        status: "pending",
+        snoozeCount: 0,
+      };
+      await remedy.save();
+
+      await RemedyLog.create({
+        userId: remedy.userId?._id || remedy.userId,
+        remedyId: remedy._id,
+        remedyName: remedy.name,
+        scheduledFor: remedy.nextDoseAt,
+        action: "resumed",
+        actionAt: now,
+        skipReason: "Reanudación automática al finalizar período de pausa",
+      });
+
+      if (remedy.userId?.telegramChatId) {
+        try {
+          await sendTelegramTextMessage(
+            remedy.userId.telegramChatId,
+            `▶️ <b>MEDICACIÓN REANUDADA AUTOMÁTICAMENTE</b>\n\n` +
+              `El período de pausa para <b>${remedy.name}</b> ha finalizado. Los recordatorios vuelven a estar activos.`,
+          );
+        } catch (err) {
+          console.error("[RemedyScheduler] Error enviando aviso de reanudación:", err);
+        }
+      }
+    }
 
     // Query active remedies
     const remedies = await Remedy.find({ isActive: true }).populate<{

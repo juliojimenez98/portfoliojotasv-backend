@@ -19,6 +19,8 @@ export interface RemedyDocument extends Document {
   nextDoseAt: Date;
   snoozeMinutes: number; // default 15, editable per remedy
   isActive: boolean;
+  pausedUntil?: Date | null; // null = indefinite if isActive is false
+  pauseReason?: string;
   reminderState: ReminderState;
   createdAt: Date;
   updatedAt: Date;
@@ -79,6 +81,14 @@ const RemedySchema = new Schema<RemedyDocument>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    pausedUntil: {
+      type: Date,
+      default: null,
+    },
+    pauseReason: {
+      type: String,
+      trim: true,
     },
     reminderState: {
       type: ReminderStateSchema,
