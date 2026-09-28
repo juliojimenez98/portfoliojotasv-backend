@@ -19,6 +19,8 @@ export interface AccountDocument extends Document {
   creditLimit?: number;
   internationalCreditLimit?: number; // Total international credit limit in USD
   internationalBalance?: number; // Available international credit in USD
+  billingDay?: number; // Cutoff / statement closing day of the month (1-31)
+  paymentDueDay?: number; // Payment due day of the month (1-31)
   color: string;
   icon: string;
   refreshType: RefreshType;
@@ -80,6 +82,18 @@ const AccountSchema = new Schema<AccountDocument>(
     internationalBalance: {
       type: Number,
       required: false,
+    },
+    billingDay: {
+      type: Number,
+      required: false,
+      min: [1, "El día de facturación debe ser entre 1 y 31"],
+      max: [31, "El día de facturación debe ser entre 1 y 31"],
+    },
+    paymentDueDay: {
+      type: Number,
+      required: false,
+      min: [1, "El día de vencimiento debe ser entre 1 y 31"],
+      max: [31, "El día de vencimiento debe ser entre 1 y 31"],
     },
     color: {
       type: String,
