@@ -25,7 +25,7 @@ export const runMigrations = async () => {
           email: adminEmail,
           password: adminPassword,
           isAdmin: true,
-          allowedApps: ['gastos'], // Acceso por defecto a la app de gastos
+          allowedApps: ['gastos', 'remedios', 'actividades'],
         });
         await adminUser.save();
         console.log('[Migration] Usuario administrador inicial creado con éxito.');
@@ -44,6 +44,10 @@ export const runMigrations = async () => {
           adminUser.allowedApps.push("remedios");
           modified = true;
         }
+        if (!adminUser.allowedApps.includes("actividades")) {
+          adminUser.allowedApps.push("actividades");
+          modified = true;
+        }
 
         if (modified) {
           await adminUser.save();
@@ -60,6 +64,13 @@ export const runMigrations = async () => {
       { $addToSet: { allowedApps: "remedios" } },
     );
     console.log("[Migration] Acceso a 'remedios' otorgado a todos los usuarios.");
+
+    // 3. Otorgar acceso a la app 'actividades' a todos los usuarios existentes
+    await User.updateMany(
+      { allowedApps: { $ne: "actividades" } },
+      { $addToSet: { allowedApps: "actividades" } },
+    );
+    console.log("[Migration] Acceso a 'actividades' otorgado a todos los usuarios.");
 
     // Aquí se pueden añadir futuras migraciones (ej: agregar nuevas columnas a documentos existentes)
     // ...

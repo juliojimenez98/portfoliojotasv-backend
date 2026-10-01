@@ -15,6 +15,7 @@ import currencyRoutes from "./routes/currency.routes";
 import profileRoutes from "./routes/profile.routes";
 import periodRoutes from "./routes/period.routes";
 import remedyRoutes from "./routes/remedy.routes";
+import activityRoutes from "./routes/activity.routes";
 import telegramWebhookRoutes from "./routes/telegramWebhook.routes";
 import { checkAndSendPaydayEmails } from "./services/paydayScheduler";
 import { checkAndSendReminders } from "./services/remedyScheduler";
@@ -56,6 +57,7 @@ app.use("/api/currency", currencyRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/periods", periodRoutes);
 app.use("/api/remedies", remedyRoutes);
+app.use("/api/activities", activityRoutes);
 app.use("/api/telegram", telegramWebhookRoutes);
 
 // Basic route
